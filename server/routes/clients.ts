@@ -45,7 +45,7 @@ const naturalClientSchema = z.object({
   ...baseFields
 })
 
-export const clientSchema = z.discriminatedUnion('type', [
+const clientSchema = z.discriminatedUnion('type', [
   legalClientSchema,
   naturalClientSchema
 ])
@@ -62,12 +62,12 @@ const createNaturalClientSchema = naturalClientSchema.omit({
   updatedAt: true
 })
 
-export const createClientSchema = z.discriminatedUnion('type', [
+const createClientSchema = z.discriminatedUnion('type', [
   createLegalClientSchema,
   createNaturalClientSchema
 ])
 
-type Client = z.infer<typeof clientSchema>
+export type Client = z.infer<typeof clientSchema>
 
 const fakeClients: Client[] = [
   {

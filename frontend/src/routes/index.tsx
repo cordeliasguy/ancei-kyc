@@ -12,6 +12,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Plus, Search, FileText, Users, Edit } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -44,7 +45,8 @@ function Index() {
   const filteredClients = clients.filter(
     client =>
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchTerm.toLowerCase())
+      (client.type === 'natural' &&
+        client.email.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   return (
@@ -71,12 +73,11 @@ function Index() {
               className="pl-10"
             />
           </div>
-          <Button
-            // onClick={() => setShowClientForm(true)}
-            className="flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add New Client
+          <Button asChild className="flex items-center gap-2">
+            <Link to="/client">
+              <Plus className="h-4 w-4" />
+              Add New Client
+            </Link>
           </Button>
         </div>
 
@@ -124,7 +125,7 @@ function Index() {
                       <tr key={client.id} className="border-b hover:bg-gray-50">
                         <td className="py-3 px-4 font-medium">{client.name}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">
-                          {client.email}
+                          {client.type === 'natural' && client.email}
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
