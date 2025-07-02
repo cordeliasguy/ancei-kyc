@@ -1,6 +1,7 @@
 # syntax = docker/dockerfile:1
+
 # Adjust BUN_VERSION as desired
-ARG BUN_VERSION=1.2.17
+ARG BUN_VERSION=1.1.13
 FROM oven/bun:${BUN_VERSION}-slim AS base
 
 # Bun app lives here
@@ -17,11 +18,11 @@ RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
 
 # Install node modules
-COPY --link bun.lock package.json ./ 
+COPY --link bun.lockb package.json ./
 RUN bun install --ci
 
 # Install frontend node modules
-COPY --link frontend/bun.lock frontend/package.json ./frontend/ 
+COPY --link frontend/bun.lockb frontend/package.json ./frontend/
 RUN cd frontend && bun install --ci
 
 # Copy application code
