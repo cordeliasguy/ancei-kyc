@@ -1,7 +1,8 @@
 import React, { useRef } from 'react'
 import { Button } from './ui/button'
-import { FileText, Download } from 'lucide-react'
+import { PrinterIcon as Print, Download, ArrowLeft } from 'lucide-react'
 import type { Client } from '@server/routes/clients'
+import { Link } from '@tanstack/react-router'
 
 type Props = {
   formData: Client
@@ -76,85 +77,71 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
     })
   }
 
-  const formatPercentage = (direct: number, indirect: number) => {
-    if (direct > 0 && indirect > 0) {
-      return `${direct}% (D) / ${indirect}% (I)`
-    } else if (direct > 0) {
-      return `${direct}% (D)`
-    } else if (indirect > 0) {
-      return `${indirect}% (I)`
-    }
-    return '0%'
-  }
-
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Button onClick={generatePDF} className="flex items-center gap-2">
-          <Download className="h-4 w-4" />
-          Generate PDF
+      <div className="mb-6 flex items-center justify-between print:hidden">
+        <Button variant="outline" className="mb-4 bg-transparent" asChild>
+          <Link to="/">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Link>
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => window.print()}
-          className="flex items-center gap-2"
-        >
-          <FileText className="h-4 w-4" />
-          Print Preview
-        </Button>
+
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => window.print()}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <Print className="h-4 w-4" />
+            Print
+          </Button>
+          <Button
+            onClick={generatePDF}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <Download className="h-4 w-4" />
+            Download PDF
+          </Button>
+        </div>
       </div>
 
-      {/* PDF Content - Hidden but rendered */}
-      <div
-        ref={pdfRef}
-        className="bg-white p-8 shadow-lg max-w-4xl mx-auto"
-        style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '12px',
-          lineHeight: '1.4',
-          color: '#000',
-          minHeight: '297mm', // A4 height
-          width: '210mm' // A4 width
-        }}
-      >
+      {/* KYC Document */}
+      <div ref={pdfRef} className="mx-auto max-w-4xl p-8 bg-white">
         {/* Header */}
-        <div className="text-center mb-6 pb-4 border-b-2 border-gray-300">
-          <div className="text-xs text-gray-600 mb-2">
+        <div className="text-center mb-8 border-b pb-4">
+          <div className="text-sm text-gray-600 mb-2">
             Edifici Centre Júlia, Av/ Carlemany, 115, 5a planta - AD700
             Escaldes-Engordany - Principat d'Andorra
           </div>
-          <div className="text-xs text-gray-600 mb-4">
+          <div className="text-sm text-gray-600 mb-4">
             Tel.: (+376) 808 175 - ancei@ancei.com - www.ancei.com
           </div>
-          <div className="text-right text-xs">
+          <div className="text-right text-sm">
             Signatura del client: ___________________
           </div>
         </div>
 
-        <div className="text-right text-xs mb-4">1</div>
+        {/* Page Number */}
+        <div className="text-right text-sm mb-4">1</div>
 
         {/* Title */}
-        <h1 className="text-lg font-bold text-center mb-6">
-          IDENTIFICACIÓ DEL CLIENT (KYC)
-        </h1>
+        <div className="text-center mb-6">
+          <h1 className="text-xl font-bold">IDENTIFICACIÓ DEL CLIENT (KYC)¹</h1>
+          <h2 className="text-lg font-semibold mt-2">☐ PERSONA JURÍDICA</h2>
+        </div>
 
-        <h2 className="text-base font-bold mb-4">1 PERSONA JURÍDICA</h2>
-
-        {/* Form Fields */}
+        {/* Company Information */}
         <div className="space-y-6">
-          {/* Company Name */}
           <div>
-            <div className="font-semibold mb-1">Denominació social</div>
-            <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-              {formData.name || 'XXX, SLU'}
-            </div>
+            <div className="font-semibold mb-2">Denominació social</div>
+            <div className="border-b border-gray-300 pb-1">{formData.name}</div>
           </div>
 
-          {/* Address */}
           <div>
-            <div className="font-semibold mb-1">Domicili social</div>
-            <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-              {formData.address || 'C/ XXX'}
+            <div className="font-semibold mb-2">Domicili social</div>
+            <div className="border-b border-gray-300 pb-1 whitespace-pre-line">
+              {formData.address}
             </div>
           </div>
 
@@ -164,36 +151,35 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
               <div className="font-semibold mb-2">
                 Representants (persona física)
               </div>
-              <div className="grid grid-cols-2 gap-4 mb-2">
-                <div className="font-medium text-center border-b border-gray-300 pb-1">
-                  Nom i cognoms
-                </div>
-                <div className="font-medium text-center border-b border-gray-300 pb-1">
-                  Actua com a
-                </div>
-              </div>
-              {formData.representatives.map((rep, index) => (
-                <div key={index} className="grid grid-cols-2 gap-4 mb-2">
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-                    {rep.name}
-                  </div>
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-                    {rep.role}
-                  </div>
-                </div>
-              ))}
-              {/* Add empty rows if needed */}
-              {Array.from({
-                length: Math.max(0, 3 - formData.representatives.length)
-              }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  className="grid grid-cols-2 gap-4 mb-2"
-                >
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]"></div>
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]"></div>
-                </div>
-              ))}
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 p-2 text-left">
+                      Nom i cognoms
+                    </th>
+                    <th className="border border-gray-300 p-2 text-left">
+                      Actua com a
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.representatives.map((rep, index) => (
+                    <tr key={index}>
+                      <td className="border border-gray-300 p-2">{rep.name}</td>
+                      <td className="border border-gray-300 p-2">{rep.role}</td>
+                    </tr>
+                  ))}
+                  {/* Empty rows for additional entries */}
+                  {Array.from({
+                    length: Math.max(0, 3 - formData.representatives.length)
+                  }).map((_, index) => (
+                    <tr key={`empty-${index}`}>
+                      <td className="border border-gray-300 p-2 h-8"></td>
+                      <td className="border border-gray-300 p-2 h-8"></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
@@ -201,48 +187,47 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
           {formData.type === 'legal' && (
             <div>
               <div className="font-semibold mb-2">Beneficiaris efectius</div>
-              <div className="grid grid-cols-2 gap-4 mb-2">
-                <div className="font-medium text-center border-b border-gray-300 pb-1">
-                  Nom i cognoms
-                </div>
-                <div className="font-medium text-center border-b border-gray-300 pb-1">
-                  Percentatge participació (D i I)
-                </div>
-              </div>
-              {formData.beneficiaries.map((ben, index) => (
-                <div key={index} className="grid grid-cols-2 gap-4 mb-2">
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-                    {ben.name}
-                  </div>
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-                    {formatPercentage(
-                      ben.directPercentage,
-                      ben.indirectPercentage
-                    )}
-                  </div>
-                </div>
-              ))}
-              {/* Add empty rows if needed */}
-              {Array.from({
-                length: Math.max(0, 3 - formData.beneficiaries.length)
-              }).map((_, index) => (
-                <div
-                  key={`empty-ben-${index}`}
-                  className="grid grid-cols-2 gap-4 mb-2"
-                >
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]"></div>
-                  <div className="border-b border-gray-400 pb-1 min-h-[20px]"></div>
-                </div>
-              ))}
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 p-2 text-left">
+                      Nom i cognoms
+                    </th>
+                    <th className="border border-gray-300 p-2 text-left">
+                      Percentatge participació (D i I)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.beneficiaries.map((ben, index) => (
+                    <tr key={index}>
+                      <td className="border border-gray-300 p-2">{ben.name}</td>
+                      <td className="border border-gray-300 p-2">
+                        D: {ben.directPercentage}% / I: {ben.indirectPercentage}
+                        %
+                      </td>
+                    </tr>
+                  ))}
+                  {/* Empty rows for additional entries */}
+                  {Array.from({
+                    length: Math.max(0, 3 - formData.beneficiaries.length)
+                  }).map((_, index) => (
+                    <tr key={`empty-${index}`}>
+                      <td className="border border-gray-300 p-2 h-8"></td>
+                      <td className="border border-gray-300 p-2 h-8"></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 
           {/* Economic Activity */}
           <div>
-            <div className="font-semibold mb-1">
+            <div className="font-semibold mb-2">
               Activitat econòmica de la societat
             </div>
-            <div className="border-b border-gray-400 pb-1 min-h-[40px] whitespace-pre-wrap">
+            <div className="border border-gray-300 p-2 min-h-[60px] whitespace-pre-line">
               {formData.economicActivity}
             </div>
           </div>
@@ -250,11 +235,11 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
           {/* Operating Countries */}
           {formData.type === 'legal' && (
             <div>
-              <div className="font-semibold mb-1">
+              <div className="font-semibold mb-2">
                 Països on desenvolupa la seva activitat i sistemes de
                 distribució de productes / serveis
               </div>
-              <div className="border-b border-gray-400 pb-1 min-h-[40px]">
+              <div className="border border-gray-300 p-2 min-h-[60px] whitespace-pre-line">
                 {formData.operatingCountries.join(', ')}
               </div>
             </div>
@@ -262,29 +247,26 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
 
           {/* PEP Information */}
           <div>
-            <div className="font-semibold mb-1">
+            <div className="font-semibold mb-2">
               Persona políticament exposada (PEP)
             </div>
-            <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-              {formData.isPEP ? 'Sí' : 'No'}
-              {formData.isPEP &&
-                formData.pepDetails &&
-                ` - ${formData.pepDetails}`}
+            <div className="border border-gray-300 p-2 min-h-[60px]">
+              {formData.isPEP ? `Sí - ${formData.pepDetails}` : 'No'}
             </div>
           </div>
 
           {/* PEP Relation */}
           <div>
-            <div className="font-semibold mb-1">Relació amb algun PEP</div>
-            <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-              {formData.pepRelation || ''}
+            <div className="font-semibold mb-2">Relació amb algun PEP</div>
+            <div className="border border-gray-300 p-2 min-h-[60px] whitespace-pre-line">
+              {formData.pepRelation || 'Cap relació'}
             </div>
           </div>
 
           {/* Origin of Funds */}
           <div>
-            <div className="font-semibold mb-1">Origen dels fons</div>
-            <div className="border-b border-gray-400 pb-1 min-h-[40px] whitespace-pre-wrap">
+            <div className="font-semibold mb-2">Origen dels fons</div>
+            <div className="border border-gray-300 p-2 min-h-[60px] whitespace-pre-line">
               {formData.fundsOrigin}
             </div>
           </div>
@@ -292,8 +274,8 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
 
         {/* Footer Note */}
         <div className="mt-8 text-xs text-gray-600">
-          <sup>1</sup> És obligació del client mantenir actualitzades les dades
-          de forma que corresponguin a la realitat en cada moment. Serà motiu de
+          ¹ És obligació del client mantenir actualitzades les dades de forma
+          que corresponguin a la realitat en cada moment. Serà motiu de
           resolució contractual qualsevol fet que doni sospites d'una activitat
           delictiva per part del client. Al mateix temps, es comunica al client
           que, en aplicació de la Llei 10/2017, de prevenció i lluita contra el
@@ -304,29 +286,29 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
         </div>
 
         {/* Page Break */}
-        <div style={{ pageBreakBefore: 'always' }} className="pt-8">
+        <div className="page-break-before mt-12 pt-8">
           {/* Header for page 2 */}
-          <div className="text-center mb-6 pb-4 border-b-2 border-gray-300">
-            <div className="text-xs text-gray-600 mb-2">
+          <div className="text-center mb-8 border-b pb-4">
+            <div className="text-sm text-gray-600 mb-2">
               Edifici Centre Júlia, Av/ Carlemany, 115, 5a planta - AD700
               Escaldes-Engordany - Principat d'Andorra
             </div>
-            <div className="text-xs text-gray-600 mb-4">
+            <div className="text-sm text-gray-600 mb-4">
               Tel.: (+376) 808 175 - ancei@ancei.com - www.ancei.com
             </div>
-            <div className="text-right text-xs">
+            <div className="text-right text-sm">
               Signatura del client: ___________________
             </div>
           </div>
 
-          <div className="text-right text-xs mb-4">2</div>
+          {/* Page Number */}
+          <div className="text-right text-sm mb-4">2</div>
 
           {/* Requested Services */}
-          <div className="mb-6">
+          <div className="mb-8">
             <div className="font-semibold mb-2">Serveis sol·licitats</div>
-            <div className="border-b border-gray-400 pb-1 min-h-[20px]">
-              {formData.requestedServices.join(', ') ||
-                'Comptabilitat, IGI, IS.'}
+            <div className="border-b border-gray-300 pb-1">
+              {formData.requestedServices}
             </div>
           </div>
 
@@ -335,129 +317,153 @@ const KYCPDFGenerator: React.FC<Props> = ({ formData, onGeneratePDF }) => {
             <div className="font-semibold mb-4">
               Manifestació relativa als fons aportats
             </div>
-            <div className="mb-4">
-              El client manifesta i expressament declara que
+            <div className="space-y-4">
+              <p>El client manifesta i expressament declara que</p>
+              <ul className="list-disc pl-6 space-y-2">
+                <li>
+                  Els fons aportats a ANCEI, SA no provenen d'activitats
+                  relacionades amb activitats de blanqueig de capitals i
+                  finançament al terrorisme.
+                </li>
+                <li>
+                  Els fons aportats a ANCEI, SA han estat degudament declarats
+                  al seu país de residència fiscal i, a la vegada, que han pagat
+                  els impostos que li corresponien.
+                </li>
+                <li>
+                  El representants declaren tenir la capacitat legal per actuar
+                  en nom de l'empresa.
+                </li>
+              </ul>
             </div>
-            <ul className="space-y-2 ml-4">
-              <li>
-                • Els fons aportats a ANCEI, SA no provenen d'activitats
-                relacionades amb activitats de blanqueig de capitals i
-                finançament al terrorisme.
-              </li>
-              <li>
-                • Els fons aportats a ANCEI, SA han estat degudament declarats
-                al seu país de residència fiscal i, a la vegada, que han pagat
-                els impostos que li corresponien.
-              </li>
-              <li>
-                • El representants declaren tenir la capacitat legal per actuar
-                en nom de l'empresa.
-              </li>
-            </ul>
           </div>
 
           {/* Signatures */}
           <div className="mb-8">
-            <div className="mb-4">
+            <p className="mb-6">
               I en prova de conformitat, signen ambdues parts el present
               document
-            </div>
-            <div className="mb-6">
-              <strong>Data i lloc:</strong> Escaldes-Engordany, {formatDate()}
-            </div>
-            <div className="grid grid-cols-2 gap-8">
+            </p>
+            <p className="mb-8">
+              Data i lloc: Escaldes-Engordany, {formatDate()}
+            </p>
+
+            <div className="flex justify-between mt-16">
               <div className="text-center">
-                <div className="border-b border-gray-400 mb-2 pb-8"></div>
+                <div className="border-t border-gray-400 w-48 mb-2"></div>
                 <div>
                   Sr.{' '}
                   {(formData.type === 'legal' &&
                     formData.representatives[0]?.name) ||
-                    'XXX'}
+                    '_______________'}
                 </div>
               </div>
               <div className="text-center">
-                <div className="border-b border-gray-400 mb-2 pb-8"></div>
+                <div className="border-t border-gray-400 w-48 mb-2"></div>
                 <div>Responsable del Client</div>
               </div>
             </div>
           </div>
 
-          {/* ANCEI Data Section */}
-          <div className="mt-12">
+          {/* Internal Data Section */}
+          <div className="mt-12 border-t pt-8">
             <div className="font-semibold mb-4">DADES PER OMPLIR PER ANCEI</div>
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <div className="font-medium mb-2">Mesures de diligència</div>
-                <div className="space-y-1">
-                  <div>☐ Simplificada</div>
-                  <div>☐ Convencional</div>
-                  <div>☐ Reforçada</div>
-                </div>
-              </div>
-              <div>
-                <div className="font-medium mb-2">
-                  Acceptació per part de de l'OCIC
-                </div>
-                <div>(Signatura, nom i data)</div>
-                <div className="border border-gray-400 h-16 mt-2"></div>
-              </div>
-            </div>
 
-            <div className="mt-6 space-y-2">
-              <div>☐ Escriptura constitució</div>
-              <div>☐ Nomenament representant</div>
-              <div>☐ Gràfic estructura propietat</div>
-              <div>☐ Altres</div>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <div>
-                <span>☐ Namebook.es</span>
-                <span className="ml-8">Data de recerca: _______________</span>
-              </div>
-              <div>
-                <span>☐ Llistat ONU</span>
-                <span className="ml-8">Data de recerca: _______________</span>
-              </div>
-            </div>
+            <table className="w-full border-collapse mb-4">
+              <thead>
+                <tr>
+                  <th className="border border-gray-300 p-2 text-left">
+                    Mesures de diligència
+                  </th>
+                  <th className="border border-gray-300 p-2 text-left">
+                    Acceptació per part de de l'OCIC
+                    <br />
+                    (Signatura, nom i data)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-gray-300 p-2">
+                    <div>• Simplificada</div>
+                    <div>• Convencional</div>
+                    <div>• Reforçada</div>
+                  </td>
+                  <td className="border border-gray-300 p-2 h-20"></td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">
+                    <div>• Escriptura constitució</div>
+                    <div>• Nomenament representant</div>
+                    <div>• Gràfic estructura propietat</div>
+                    <div>• Altres</div>
+                  </td>
+                  <td className="border border-gray-300 p-2 h-24"></td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">
+                    <div>• Namebook.es</div>
+                    <div>Data de recerca: ___________</div>
+                  </td>
+                  <td className="border border-gray-300 p-2 h-16"></td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-300 p-2">
+                    <div>• Llistat ONU</div>
+                    <div>Data de recerca: ___________</div>
+                  </td>
+                  <td className="border border-gray-300 p-2 h-16"></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Page 3 - Updates */}
-        <div style={{ pageBreakBefore: 'always' }} className="pt-8">
-          <div className="text-center mb-6 pb-4 border-b-2 border-gray-300">
-            <div className="text-xs text-gray-600 mb-2">
+        {/* Updates Section - Page 4 */}
+        <div className="page-break-before mt-12 pt-8">
+          {/* Header for page 4 */}
+          <div className="text-center mb-8 border-b pb-4">
+            <div className="text-sm text-gray-600 mb-2">
               Edifici Centre Júlia, Av/ Carlemany, 115, 5a planta - AD700
               Escaldes-Engordany - Principat d'Andorra
             </div>
-            <div className="text-xs text-gray-600 mb-4">
+            <div className="text-sm text-gray-600 mb-4">
               Tel.: (+376) 808 175 - ancei@ancei.com - www.ancei.com
             </div>
-            <div className="text-right text-xs">
+            <div className="text-right text-sm">
               Signatura del client: ___________________
             </div>
           </div>
 
-          <div className="text-right text-xs mb-4">4</div>
+          {/* Page Number */}
+          <div className="text-right text-sm mb-4">4</div>
 
-          <div className="font-semibold text-lg mb-6">ACTUALITZACIÓ</div>
+          {/* Updates Section */}
+          <div>
+            <div className="font-semibold mb-4 text-center">ACTUALITZACIÓ</div>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="font-medium border-b border-gray-300 pb-1">
-              Nous serveis sol·licitats
-            </div>
-            <div className="font-medium border-b border-gray-300 pb-1">
-              Data
-            </div>
+            <table className="w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="border border-gray-300 p-2 text-left w-3/4">
+                    Nous serveis sol·licitats
+                  </th>
+                  <th className="border border-gray-300 p-2 text-left w-1/4">
+                    Data
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Empty rows for future updates */}
+                {Array.from({ length: 20 }).map((_, index) => (
+                  <tr key={index}>
+                    <td className="border border-gray-300 p-2 h-8"></td>
+                    <td className="border border-gray-300 p-2 h-8"></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* Empty rows for updates */}
-          {Array.from({ length: 10 }).map((_, index) => (
-            <div key={index} className="grid grid-cols-2 gap-4 mb-2">
-              <div className="border-b border-gray-400 pb-1 min-h-[20px]"></div>
-              <div className="border-b border-gray-400 pb-1 min-h-[20px]"></div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

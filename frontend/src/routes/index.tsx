@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Plus, Search, FileText, Users, Edit } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
+import { Badge } from '@/components/ui/badge'
 
 export const Route = createFileRoute('/')({
   component: Index
@@ -115,6 +116,7 @@ function Index() {
                     <tr className="border-b">
                       <th className="text-left py-3 px-4 font-medium">Name</th>
                       <th className="text-left py-3 px-4 font-medium">Email</th>
+                      <th className="text-left py-3 px-4 font-medium">Type</th>
                       <th className="text-left py-3 px-4 font-medium">
                         Actions
                       </th>
@@ -128,13 +130,17 @@ function Index() {
                           {client.type === 'natural' && client.email}
                         </td>
                         <td className="py-3 px-4">
+                          <Badge
+                            variant={
+                              client.type === 'legal' ? 'default' : 'secondary'
+                            }
+                          >
+                            {client.type === 'legal' ? 'Legal' : 'Natural'}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              asChild
-                              // onClick={() => handleEditClientClick(client)}
-                            >
+                            <Button variant="outline" size="icon" asChild>
                               <Link
                                 to="/client/$clientId"
                                 params={{ clientId: String(client.id) }}
@@ -142,12 +148,7 @@ function Index() {
                                 <Edit className="h-4 w-4" />
                               </Link>
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              asChild
-                              // onClick={() => handleGenerateKYC(client)}
-                            >
+                            <Button variant="outline" size="icon" asChild>
                               <Link
                                 to="/preview/$clientId"
                                 params={{ clientId: String(client.id) }}

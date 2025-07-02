@@ -13,7 +13,8 @@ import { Textarea } from './ui/textarea'
 import { Switch } from './ui/switch'
 import { Link } from '@tanstack/react-router'
 import type { Client } from '@server/routes/clients'
-import { useEffect, useReducer } from 'react'
+import { useEffect, useReducer, useState } from 'react'
+import { FileUpload } from './file-upload'
 
 type Props = {
   client?: Client | null
@@ -39,6 +40,14 @@ type BaseFormData = {
   isPEP: boolean
   pepDetails?: string
   pepRelation?: string
+  files?: Array<{
+    id: string
+    name: string
+    type: string
+    size: number
+    uploadedAt: string
+    content?: string
+  }>
 }
 
 type LegalFormData = BaseFormData & {
@@ -202,6 +211,17 @@ export const ClientForm = ({ client }: Props) => {
     createInitialState(client)
   )
 
+  const [files, setFiles] = useState<
+    Array<{
+      id: string
+      name: string
+      type: string
+      size: number
+      uploadedAt: string
+      content?: string
+    }>
+  >(client?.files || [])
+
   useEffect(() => {
     if (client) {
       dispatch({ type: 'INITIALIZE_FORM', client })
@@ -216,6 +236,15 @@ export const ClientForm = ({ client }: Props) => {
 
   const handleFieldChange = (field: string, value: unknown) => {
     dispatch({ type: 'SET_FIELD', field, value })
+  }
+
+  const handleParseFiles = async () => {
+    try {
+      // Update form data with parsed information
+      console.log('Parsing files...')
+    } catch (error) {
+      console.error('Error parsing files:', error)
+    }
   }
 
   // Helper to convert array to string for display
@@ -247,7 +276,14 @@ export const ClientForm = ({ client }: Props) => {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <FileUpload
+          clientId={String(client?.id) || 'new'}
+          files={files}
+          onFilesChange={setFiles}
+          onParseFiles={handleParseFiles}
+        />
+
+        <form onSubmit={handleSubmit} className="space-y-6 mt-6">
           {/* Basic Information */}
           <Card>
             <CardHeader>

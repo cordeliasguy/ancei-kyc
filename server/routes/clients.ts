@@ -12,6 +12,18 @@ const baseFields = {
   isPEP: z.boolean(),
   pepDetails: z.string().optional(),
   pepRelation: z.string().optional(),
+  files: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        type: z.string(),
+        size: z.number(),
+        uploadedAt: z.string(),
+        content: z.string().optional()
+      })
+    )
+    .optional(),
   createdAt: z.string(), // ISO string assumed
   updatedAt: z.string() // ISO string assumed
 }
