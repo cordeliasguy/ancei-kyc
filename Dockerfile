@@ -1,43 +1,45 @@
 # syntax = docker/dockerfile:1
-
-# Use slim Bun base image
-ARG BUN_VERSION=1.2.17
+# Adjust BUN_VERSION as desired
+ARG BUN_VERSION=1.2.17 # <-- Changed this line
 FROM oven/bun:${BUN_VERSION}-slim AS base
 
+# Bun app lives here
 WORKDIR /app
-ENV NODE_ENV=production
 
-# === Build Stage ===
+# Set production environment
+ENV NODE_ENV="production"
+
+# Throw-away build stage to reduce size of final image
 FROM base AS build
 
-# Install native build dependencies
+# Install packages needed to build node modules
 RUN apt-get update -qq && \
     apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
 
-# Copy everything
+# Install node modules
+COPY --link bun.lock package.json ./ # <-- Changed bun.lockb to bun.lock
+RUN bun install --ci
+
+# Install frontend node modules
+COPY --link frontend/bun.lock frontend/package.json ./frontend/ # <-- Changed bun.lockb to bun.lock
+RUN cd frontend && bun install --ci
+
+# Copy application code
 COPY --link . .
 
-# Install backend deps
-RUN bun install --ci --frozen-lockfile
-
-# Build frontend
+# Change to frontend directory and build the frontend app
 WORKDIR /app/frontend
-RUN bun install --ci --frozen-lockfile && bun run build
+RUN bun run build
 
-# Move frontend build output to a safer place
-RUN mv dist /app/frontend-dist && rm -rf /app/frontend
+# Remove all files in frontend except for the dist folder
+RUN find . -mindepth 1 ! -regex '^./dist\(/.*\)?' -delete
 
-# === Final Runtime Image ===
+# Final stage for app image
 FROM base
 
-# Copy only what is needed
+# Copy built application
 COPY --from=build /app /app
 
-# Restore the frontend dist output to /app/frontend/dist
-RUN mkdir -p /app/frontend && mv /app/frontend-dist /app/frontend/dist
-
-# Expose the backend port (adjust if needed)
+# Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
-
-# Run your Bun server
-CMD ["bun", "run", "start"]
+CMD [ "bun", "run", "start" ]
