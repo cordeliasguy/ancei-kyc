@@ -90,7 +90,7 @@ function Index() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {filteredClients.length === 0 ? (
+            {clients.length === 0 ? (
               <div className="text-center py-8">
                 <Users className="mx-auto h-12 w-12 text-gray-400" />
                 <h3 className="mt-2 text-sm font-medium text-gray-900">
@@ -132,16 +132,28 @@ function Index() {
                             <Button
                               variant="outline"
                               size="sm"
+                              asChild
                               // onClick={() => handleEditClientClick(client)}
                             >
-                              <Edit className="h-4 w-4" />
+                              <Link
+                                to="/client/$clientId"
+                                params={{ clientId: String(client.id) }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Link>
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
+                              asChild
                               // onClick={() => handleGenerateKYC(client)}
                             >
-                              <FileText className="h-4 w-4" />
+                              <Link
+                                to="/preview/$clientId"
+                                params={{ clientId: String(client.id) }}
+                              >
+                                <FileText className="h-4 w-4" />
+                              </Link>
                             </Button>
                           </div>
                         </td>
