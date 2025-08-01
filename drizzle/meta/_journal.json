@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1753805551589,
+      "tag": "0000_sparkling_makkari",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1753885076967,
+      "tag": "0001_nappy_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753887357365,
+      "tag": "0002_aspiring_menace",
+      "breakpoints": true
+    }
+  ]
+}

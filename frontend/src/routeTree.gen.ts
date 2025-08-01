@@ -11,32 +11,73 @@
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as AuthenticatedImport } from './routes/_authenticated'
 import { Route as IndexImport } from './routes/index'
-import { Route as ClientIndexImport } from './routes/client/index'
-import { Route as PreviewClientIdImport } from './routes/preview/$clientId'
-import { Route as ClientClientIdImport } from './routes/client/$clientId'
+import { Route as CompanyLoginIndexImport } from './routes/company/login/index'
+import { Route as ClientNaturalIndexImport } from './routes/client/natural/index'
+import { Route as ClientLegalIndexImport } from './routes/client/legal/index'
+import { Route as AuthenticatedCompanyDashboardIndexImport } from './routes/_authenticated/company/dashboard/index'
+import { Route as AuthenticatedCompanyClientsIndexImport } from './routes/_authenticated/company/clients/index'
+import { Route as AuthenticatedCompanyViewKycIdImport } from './routes/_authenticated/company/view/$kycId'
+import { Route as AuthenticatedCompanyReviewKycIdImport } from './routes/_authenticated/company/review/$kycId'
+import { Route as AuthenticatedCompanyComplianceKycIdImport } from './routes/_authenticated/company/compliance/$kycId'
 
 // Create/Update Routes
+
+const AuthenticatedRoute = AuthenticatedImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const IndexRoute = IndexImport.update({
   path: '/',
   getParentRoute: () => rootRoute,
 } as any)
 
-const ClientIndexRoute = ClientIndexImport.update({
-  path: '/client/',
+const CompanyLoginIndexRoute = CompanyLoginIndexImport.update({
+  path: '/company/login/',
   getParentRoute: () => rootRoute,
 } as any)
 
-const PreviewClientIdRoute = PreviewClientIdImport.update({
-  path: '/preview/$clientId',
+const ClientNaturalIndexRoute = ClientNaturalIndexImport.update({
+  path: '/client/natural/',
   getParentRoute: () => rootRoute,
 } as any)
 
-const ClientClientIdRoute = ClientClientIdImport.update({
-  path: '/client/$clientId',
+const ClientLegalIndexRoute = ClientLegalIndexImport.update({
+  path: '/client/legal/',
   getParentRoute: () => rootRoute,
 } as any)
+
+const AuthenticatedCompanyDashboardIndexRoute =
+  AuthenticatedCompanyDashboardIndexImport.update({
+    path: '/company/dashboard/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedCompanyClientsIndexRoute =
+  AuthenticatedCompanyClientsIndexImport.update({
+    path: '/company/clients/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedCompanyViewKycIdRoute =
+  AuthenticatedCompanyViewKycIdImport.update({
+    path: '/company/view/$kycId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedCompanyReviewKycIdRoute =
+  AuthenticatedCompanyReviewKycIdImport.update({
+    path: '/company/review/$kycId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+
+const AuthenticatedCompanyComplianceKycIdRoute =
+  AuthenticatedCompanyComplianceKycIdImport.update({
+    path: '/company/compliance/$kycId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 // Populate the FileRoutesByPath interface
 
@@ -46,17 +87,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
-    '/client/$clientId': {
-      preLoaderRoute: typeof ClientClientIdImport
+    '/_authenticated': {
+      preLoaderRoute: typeof AuthenticatedImport
       parentRoute: typeof rootRoute
     }
-    '/preview/$clientId': {
-      preLoaderRoute: typeof PreviewClientIdImport
+    '/client/legal/': {
+      preLoaderRoute: typeof ClientLegalIndexImport
       parentRoute: typeof rootRoute
     }
-    '/client/': {
-      preLoaderRoute: typeof ClientIndexImport
+    '/client/natural/': {
+      preLoaderRoute: typeof ClientNaturalIndexImport
       parentRoute: typeof rootRoute
+    }
+    '/company/login/': {
+      preLoaderRoute: typeof CompanyLoginIndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/_authenticated/company/compliance/$kycId': {
+      preLoaderRoute: typeof AuthenticatedCompanyComplianceKycIdImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/company/review/$kycId': {
+      preLoaderRoute: typeof AuthenticatedCompanyReviewKycIdImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/company/view/$kycId': {
+      preLoaderRoute: typeof AuthenticatedCompanyViewKycIdImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/company/clients/': {
+      preLoaderRoute: typeof AuthenticatedCompanyClientsIndexImport
+      parentRoute: typeof AuthenticatedImport
+    }
+    '/_authenticated/company/dashboard/': {
+      preLoaderRoute: typeof AuthenticatedCompanyDashboardIndexImport
+      parentRoute: typeof AuthenticatedImport
     }
   }
 }
@@ -65,9 +130,16 @@ declare module '@tanstack/react-router' {
 
 export const routeTree = rootRoute.addChildren([
   IndexRoute,
-  ClientClientIdRoute,
-  PreviewClientIdRoute,
-  ClientIndexRoute,
+  AuthenticatedRoute.addChildren([
+    AuthenticatedCompanyComplianceKycIdRoute,
+    AuthenticatedCompanyReviewKycIdRoute,
+    AuthenticatedCompanyViewKycIdRoute,
+    AuthenticatedCompanyClientsIndexRoute,
+    AuthenticatedCompanyDashboardIndexRoute,
+  ]),
+  ClientLegalIndexRoute,
+  ClientNaturalIndexRoute,
+  CompanyLoginIndexRoute,
 ])
 
 /* prettier-ignore-end */
