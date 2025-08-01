@@ -21,5 +21,13 @@ export default defineConfig({
       }
     },
     cors: false
+  },
+  optimizeDeps: {
+    exclude: ['postgres']
+  },
+  build: {
+    rollupOptions: {
+      external: ['postgres', 'perf_hooks', 'crypto', 'stream']
+    }
   }
 })
