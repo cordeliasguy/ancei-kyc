@@ -1,41 +1,46 @@
-import type { LegalPersonType, Shareholder } from '@/lib/types'
+import type { LegalPerson } from '@/lib/types'
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
 import { InputContainer } from './input-container'
 import { Label } from './ui/label'
 import { Input } from './ui/input'
+import type { FormShareholder } from '@server/sharedTypes'
 
 export const ShareholderForm = ({
   person,
   index,
   updatePerson,
   removePerson,
-  totalPersons
+  isViewing = false
 }: {
-  person: Shareholder
+  person: FormShareholder
   index: number
   updatePerson: (
-    type: LegalPersonType,
     id: string,
     field: string,
-    value: string
+    value: string,
+    type?: LegalPerson
   ) => void
-  removePerson: (type: LegalPersonType, id: string) => void
-  totalPersons: number
+  removePerson: (id: string, type?: LegalPerson) => void
+  isViewing?: boolean
 }) => {
+  const updateShareholder = (id: string, field: string, value: string) => {
+    updatePerson(id, field, value, 'shareholders')
+  }
+
   return (
     <div className="border rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-center">
         <h5 className="font-medium">Accionista #{index + 1}</h5>
-        {totalPersons > 1 && (
-          <Button
-            onClick={() => removePerson('shareholders', person.id)}
-            variant="outline"
-            size="icon"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        )}
+
+        <Button
+          onClick={() => removePerson(person.id, 'shareholders')}
+          variant="outline"
+          size="icon"
+          disabled={isViewing}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -44,110 +49,90 @@ export const ShareholderForm = ({
           <Input
             value={person.fullName}
             onChange={e =>
-              updatePerson(
-                'shareholders',
-                person.id,
-                'fullName',
-                e.target.value
-              )
+              updateShareholder(person.id, 'fullName', e.target.value)
             }
             placeholder="Nom complet"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>DNI/Passport</Label>
           <Input
-            value={person.documentNumber}
+            value={person.documentNumber || ''}
             onChange={e =>
-              updatePerson(
-                'shareholders',
-                person.id,
-                'documentNumber',
-                e.target.value
-              )
+              updateShareholder(person.id, 'documentNumber', e.target.value)
             }
             placeholder="DNI/Passport"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>Data de naixement</Label>
           <Input
-            value={person.dateOfBirth}
+            value={person.dateOfBirth || ''}
             onChange={e =>
-              updatePerson(
-                'shareholders',
-                person.id,
-                'dateOfBirth',
-                e.target.value
-              )
+              updateShareholder(person.id, 'dateOfBirth', e.target.value)
             }
             placeholder="Data"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>Activitat professional / laboral *</Label>
           <Input
-            value={person.professionalActivity}
+            value={person.professionalActivity || ''}
             onChange={e =>
-              updatePerson(
-                'shareholders',
+              updateShareholder(
                 person.id,
                 'professionalActivity',
                 e.target.value
               )
             }
             placeholder="Activitat"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>País Nacionalitat</Label>
           <Input
-            value={person.countryOfBirth}
+            value={person.countryOfBirth || ''}
             onChange={e =>
-              updatePerson(
-                'shareholders',
-                person.id,
-                'countryOfBirth',
-                e.target.value
-              )
+              updateShareholder(person.id, 'countryOfBirth', e.target.value)
             }
             placeholder="País"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>País Residència</Label>
           <Input
-            value={person.countryOfResidence}
+            value={person.countryOfResidence || ''}
             onChange={e =>
-              updatePerson(
-                'shareholders',
-                person.id,
-                'countryOfResidence',
-                e.target.value
-              )
+              updateShareholder(person.id, 'countryOfResidence', e.target.value)
             }
             placeholder="País"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>% accions</Label>
           <Input
-            value={person.ownershipPercentage}
+            value={person.ownershipPercentage || ''}
             onChange={e =>
-              updatePerson(
-                'shareholders',
+              updateShareholder(
                 person.id,
                 'ownershipPercentage',
                 e.target.value
               )
             }
             placeholder="%"
+            disabled={isViewing}
           />
         </InputContainer>
       </div>

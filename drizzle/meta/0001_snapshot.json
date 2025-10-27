@@ -1,6 +1,6 @@
 {
-  "id": "6743e431-2405-4091-aa3f-0644d3355837",
-  "prevId": "24929610-c5cc-4220-aed0-28b3a05e3655",
+  "id": "92bde642-4331-48d8-9935-8bc689389b75",
+  "prevId": "36721260-ba78-4620-83ce-4ed0c282b9a4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -276,11 +276,31 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'admin'"
+          "default": "'responsible'"
+        },
+        "agency_id": {
+          "name": "agency_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "user_agency_id_agencies_id_fk": {
+          "name": "user_agency_id_agencies_id_fk",
+          "tableFrom": "user",
+          "tableTo": "agencies",
+          "columnsFrom": [
+            "agency_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
         "user_email_unique": {
@@ -430,9 +450,620 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
+    },
+    "public.activity_regions": {
+      "name": "activity_regions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "kyc_id": {
+          "name": "kyc_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "region": {
+          "name": "region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "activity_regions_kyc_id_kyc_documents_id_fk": {
+          "name": "activity_regions_kyc_id_kyc_documents_id_fk",
+          "tableFrom": "activity_regions",
+          "tableTo": "kyc_documents",
+          "columnsFrom": [
+            "kyc_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.kyc_documents": {
+      "name": "kyc_documents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "type": {
+          "name": "type",
+          "type": "kyc_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "kyc_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'submitted'"
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "birth_date": {
+          "name": "birth_date",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "birth_country": {
+          "name": "birth_country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nationality": {
+          "name": "nationality",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_type": {
+          "name": "document_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "document_number": {
+          "name": "document_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gender": {
+          "name": "gender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "professional_activity": {
+          "name": "professional_activity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profession": {
+          "name": "profession",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marital_status": {
+          "name": "marital_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "partner_full_name": {
+          "name": "partner_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "marital_economic_regime": {
+          "name": "marital_economic_regime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "name": "phone",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_name": {
+          "name": "company_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_phone": {
+          "name": "company_phone",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_email": {
+          "name": "company_email",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registration_date": {
+          "name": "registration_date",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "registration_city": {
+          "name": "registration_city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tax_id": {
+          "name": "tax_id",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "company_purpose": {
+          "name": "company_purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "geographic_scope": {
+          "name": "geographic_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "annual_revenue": {
+          "name": "annual_revenue",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_branches": {
+          "name": "has_branches",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "branches_details": {
+          "name": "branches_details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_main_branch": {
+          "name": "is_main_branch",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "main_branch_details": {
+          "name": "main_branch_details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_listed_on_regulated_market": {
+          "name": "is_listed_on_regulated_market",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "regulated_market_details": {
+          "name": "regulated_market_details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_full_name": {
+          "name": "representative_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_date_of_birth": {
+          "name": "representative_date_of_birth",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_country_of_birth": {
+          "name": "representative_country_of_birth",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_nationality": {
+          "name": "representative_nationality",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_document_type": {
+          "name": "representative_document_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_document_number": {
+          "name": "representative_document_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_gender": {
+          "name": "representative_gender",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_professional_activity": {
+          "name": "representative_professional_activity",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_profession": {
+          "name": "representative_profession",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_marital_status": {
+          "name": "representative_marital_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_partner_full_name": {
+          "name": "representative_partner_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_marital_economic_regime": {
+          "name": "representative_marital_economic_regime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_phone": {
+          "name": "representative_phone",
+          "type": "varchar(30)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "representative_email": {
+          "name": "representative_email",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fiscal_address": {
+          "name": "fiscal_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fiscal_city": {
+          "name": "fiscal_city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fiscal_postal_code": {
+          "name": "fiscal_postal_code",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fiscal_country": {
+          "name": "fiscal_country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_address": {
+          "name": "postal_address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_city": {
+          "name": "postal_city",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_postal_code": {
+          "name": "postal_postal_code",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "postal_country": {
+          "name": "postal_country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "funds_not_from_money_laundering": {
+          "name": "funds_not_from_money_laundering",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "funds_source": {
+          "name": "funds_source",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "funds_source_details": {
+          "name": "funds_source_details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acting_on_own_behalf": {
+          "name": "acting_on_own_behalf",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acting_on_behalf_of_third_party": {
+          "name": "acting_on_behalf_of_third_party",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "third_party_represented": {
+          "name": "third_party_represented",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "authorized_verification": {
+          "name": "authorized_verification",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "no_tax_procedure": {
+          "name": "no_tax_procedure",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "legal_funds_origin": {
+          "name": "legal_funds_origin",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "business_purpose": {
+          "name": "business_purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cash_usage": {
+          "name": "cash_usage",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_risky_sector": {
+          "name": "is_risky_sector",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "risky_sector": {
+          "name": "risky_sector",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_pep": {
+          "name": "is_pep",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_self_exposed": {
+          "name": "is_self_exposed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_family_exposed": {
+          "name": "is_family_exposed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_associates_exposed": {
+          "name": "is_associates_exposed",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "has_held_public_function": {
+          "name": "has_held_public_function",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "family_has_held_public_function": {
+          "name": "family_has_held_public_function",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "close_person_has_held_public_function": {
+          "name": "close_person_has_held_public_function",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.related_persons": {
+      "name": "related_persons",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "kyc_id": {
+          "name": "kyc_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "period": {
+          "name": "period",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "country": {
+          "name": "country",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "relationship": {
+          "name": "relationship",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "related_persons_kyc_id_kyc_documents_id_fk": {
+          "name": "related_persons_kyc_id_kyc_documents_id_fk",
+          "tableFrom": "related_persons",
+          "tableTo": "kyc_documents",
+          "columnsFrom": [
+            "kyc_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
-  "enums": {},
+  "enums": {
+    "public.kyc_status": {
+      "name": "kyc_status",
+      "schema": "public",
+      "values": [
+        "submitted",
+        "responsible_reviewed",
+        "compliance_reviewed",
+        "specialist_reviewed",
+        "completed"
+      ]
+    },
+    "public.kyc_type": {
+      "name": "kyc_type",
+      "schema": "public",
+      "values": [
+        "natural",
+        "legal"
+      ]
+    }
+  },
   "schemas": {},
   "sequences": {},
   "roles": {},

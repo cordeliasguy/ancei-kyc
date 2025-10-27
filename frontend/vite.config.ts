@@ -2,11 +2,18 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react-swc'
 import { defineConfig } from 'vite'
-import { TanStackRouterVite } from '@tanstack/router-vite-plugin'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), TanStackRouterVite(), tailwindcss()],
+  plugins: [
+    tanstackRouter({
+      target: 'react',
+      autoCodeSplitting: true
+    }),
+    react(),
+    tailwindcss()
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -21,13 +28,5 @@ export default defineConfig({
       }
     },
     cors: false
-  },
-  optimizeDeps: {
-    exclude: ['postgres']
-  },
-  build: {
-    rollupOptions: {
-      external: ['postgres', 'perf_hooks', 'crypto', 'stream']
-    }
   }
 })

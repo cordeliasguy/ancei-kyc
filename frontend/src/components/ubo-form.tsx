@@ -1,41 +1,46 @@
-import type { LegalPersonType, UBO } from '@/lib/types'
+import type { LegalPerson } from '@/lib/types'
 import { Button } from './ui/button'
 import { Trash2 } from 'lucide-react'
 import { InputContainer } from './input-container'
 import { Label } from './ui/label'
 import { Input } from './ui/input'
+import type { FormUbo } from '@server/sharedTypes'
 
 export const UBOForm = ({
   person,
   index,
   updatePerson,
   removePerson,
-  totalPersons
+  isViewing = false
 }: {
-  person: UBO
+  person: FormUbo
   index: number
   updatePerson: (
-    type: LegalPersonType,
     id: string,
     field: string,
-    value: string
+    value: string,
+    type?: LegalPerson
   ) => void
-  removePerson: (type: LegalPersonType, id: string) => void
-  totalPersons: number
+  removePerson: (id: string, type?: LegalPerson) => void
+  isViewing?: boolean
 }) => {
+  const updateUBO = (id: string, field: string, value: string) => {
+    updatePerson(id, field, value, 'ubos')
+  }
+
   return (
     <div className="border rounded-lg p-4 space-y-4">
       <div className="flex justify-between items-center">
         <h5 className="font-medium">UBO #{index + 1}</h5>
-        {totalPersons > 1 && (
-          <Button
-            onClick={() => removePerson('ubos', person.id)}
-            variant="outline"
-            size="icon"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
-        )}
+
+        <Button
+          onClick={() => removePerson(person.id, 'ubos')}
+          variant="outline"
+          size="icon"
+          disabled={isViewing}
+        >
+          <Trash2 className="size-4" />
+        </Button>
       </div>
 
       <div className="grid md:grid-cols-2 gap-4">
@@ -43,43 +48,41 @@ export const UBOForm = ({
           <Label>Noms i Cognoms *</Label>
           <Input
             value={person.fullName}
-            onChange={e =>
-              updatePerson('ubos', person.id, 'fullName', e.target.value)
-            }
+            onChange={e => updateUBO(person.id, 'fullName', e.target.value)}
             placeholder="Nom complet"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>Nacionalitat</Label>
           <Input
-            value={person.nationality}
-            onChange={e =>
-              updatePerson('ubos', person.id, 'nationality', e.target.value)
-            }
+            value={person.nationality || ''}
+            onChange={e => updateUBO(person.id, 'nationality', e.target.value)}
             placeholder="Nacionalitat"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>Número DNI/Passport</Label>
           <Input
-            value={person.documentNumber}
+            value={person.documentNumber || ''}
             onChange={e =>
-              updatePerson('ubos', person.id, 'documentNumber', e.target.value)
+              updateUBO(person.id, 'documentNumber', e.target.value)
             }
             placeholder="DNI/Passport"
+            disabled={isViewing}
           />
         </InputContainer>
 
         <InputContainer>
           <Label>Posició (**) que ocupa en la persona jurídica</Label>
           <Input
-            value={person.position}
-            onChange={e =>
-              updatePerson('ubos', person.id, 'position', e.target.value)
-            }
+            value={person.position || ''}
+            onChange={e => updateUBO(person.id, 'position', e.target.value)}
             placeholder="Posició"
+            disabled={isViewing}
           />
         </InputContainer>
       </div>

@@ -1,6 +1,12 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -19,103 +25,226 @@ import {
   MapPinHouse,
   IdCard,
   Handshake,
-  Plus
+  Plus,
+  Shield
 } from 'lucide-react'
 import { SignaturePad } from '@/components/signature-pad'
 import { Separator } from '@/components/ui/separator'
 import { InputContainer } from '@/components/input-container'
 import { RelatedPersonForm } from '@/components/related-person-form'
-import { nanoid } from 'nanoid'
-import type { LegalPersonType, NaturalClient } from '@/lib/types'
+import { v4 as uuidv4 } from 'uuid'
+import type { FormRelatedPerson } from '@server/sharedTypes'
+import type { KYCSession, KYCFormData } from '@/lib/types'
+import { toast } from 'sonner'
+import { base64ToFile, getFilledNameEntries } from '@/lib/utils'
+import { uploadFiles } from '@/utils/uploadthing'
+import {
+  linkClientDocument,
+  createKycDocument,
+  createRelatedPersons,
+  uploadClientDocument
+} from '@/lib/api'
+import { useNavigate } from '@tanstack/react-router'
+import { Spinner } from './ui/spinner'
 
 type Props = {
-  clientData: NaturalClient
-  setClientData: Dispatch<SetStateAction<NaturalClient>>
+  clientData?: KYCFormData
+  setClientData?: Dispatch<SetStateAction<KYCFormData>>
+  clientRelatedPersons?: FormRelatedPerson[]
+  setClientRelatedPersons?: Dispatch<SetStateAction<FormRelatedPerson[]>>
+  kycSession?: KYCSession
+  isViewing?: boolean
 }
 
-export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
+export const NaturalClientForm = ({
+  clientData,
+  setClientData,
+  clientRelatedPersons,
+  setClientRelatedPersons,
+  kycSession,
+  isViewing = false
+}: Props) => {
+  const navigate = useNavigate()
+  const isClientSubmit = !clientData && !!kycSession
+  const isOcicReview =
+    clientData && clientData.status === 'compliance_reviewed' && !kycSession
+
   const [clientSignature, setClientSignature] = useState<string | null>(null)
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleInputChange = (field: string, value: string | boolean) => {
-    setClientData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+  const [formData, setFormData] = useState<KYCFormData>({
+    // Personal Information
+    fullName: '',
+    birthDate: '',
+    birthCountry: '',
+    nationality: '',
+    documentType: '',
+    documentNumber: '',
+    gender: '',
+    professionalActivity: '',
+    profession: '',
+    maritalStatus: '',
+    partnerFullName: '',
+    maritalEconomicRegime: '',
+    phone: '',
+    email: '',
 
-    // Auto-fill residence address if same as fiscal
-    if (field === 'sameAddress' && value) {
-      setClientData(prev => ({
-        ...prev,
-        residenceAddress: prev.fiscalAddress,
-        residenceCity: prev.fiscalCity,
-        residencePostalCode: prev.fiscalPostalCode,
-        residenceCountry: prev.fiscalCountry
-      }))
+    // Declarations 1
+    fundsNotFromMoneyLaundering: false,
+    fundsSource: false,
+    fundsSourceDetails: '',
+    actingOnOwnBehalf: false,
+    actingOnBehalfOfThirdParty: false,
+    thirdPartyRepresented: '',
+
+    // Addresses
+    fiscalAddress: '',
+    fiscalCity: '',
+    fiscalPostalCode: '',
+    fiscalCountry: '',
+    postalAddress: '',
+    postalCity: '',
+    postalPostalCode: '',
+    postalCountry: '',
+
+    // Business Purpose
+    businessPurpose: '',
+    cashUsage: '',
+    isRiskySector: '',
+    riskySector: '',
+    isPEP: '',
+    isSelfExposed: '',
+    isFamilyExposed: '',
+    isAssociatesExposed: '',
+
+    // Declarations 2
+    authorizedVerification: false,
+    noTaxProcedure: false,
+    legalFundsOrigin: false
+  })
+
+  const [relatedPersons, setRelatedPersons] = useState<FormRelatedPerson[]>([])
+
+  const updateRelatedPerson = (id: string, field: string, value: string) => {
+    const updatedPersons = relatedPersons.map(p =>
+      p.id === id ? { ...p, [field]: value } : p
+    )
+    setRelatedPersons(updatedPersons)
+    setClientRelatedPersons?.(updatedPersons)
+  }
+
+  const removeRelatedPerson = (id: string) => {
+    setRelatedPersons(prev => prev.filter(p => p.id !== id))
+  }
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    const newData = {
+      ...formData,
+      [field]: value
     }
+    setFormData(newData)
+
+    // Sync to parent if available
+    setClientData?.(newData)
   }
 
   const hasDeclarations =
-    clientData.authorizedVerification &&
-    clientData.noTaxProcedure &&
-    clientData.legalFundsOrigin
+    formData.authorizedVerification &&
+    formData.noTaxProcedure &&
+    formData.legalFundsOrigin
 
   const isFormValid = () => {
     const requiredFields = [
       'fullName',
       'birthDate',
-      'birthPlace',
       'birthCountry',
       'nationality',
       'documentType',
       'documentNumber',
+      'profession',
       'phone',
       'email',
       'fiscalAddress',
       'fiscalCity',
-      'fiscalCountry',
-      'profession',
-      'businessPurpose',
-      'fundsOrigin'
+      'fiscalCountry'
     ]
 
     const hasRequiredFields = requiredFields.every(
-      field => clientData[field as keyof typeof clientData]
+      field => formData[field as keyof typeof formData]
     )
 
-    return hasRequiredFields && hasDeclarations && clientSignature
+    return hasRequiredFields && hasDeclarations
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!kycSession || !clientSignature) return
+
     if (!isFormValid()) {
-      alert(
-        'Si us plau, completeu tots els camps obligatoris i signeu el document'
-      )
+      toast.error('Si us plau, completeu tots els camps obligatoris ')
       return
     }
 
     setIsSubmitting(true)
 
-    // Create submission data with client linking
-    // const submissionData = {
-    //   ...clientData,
-    //   clientCode: kycSession?.clientCode,
-    //   serviceType: kycSession?.serviceType,
-    //   clientSignature,
-    //   submissionDate: new Date().toISOString(),
-    //   consultancy: kycSession?.clientInfo?.consultancy
-    // }
+    const submissionData = {
+      ...formData,
+      type: kycSession.clientType,
+      clientId: kycSession.clientId,
+      agencyId: kycSession.agencyId,
+      services: kycSession.services.map(s => s.service)
+    }
 
-    // Mock submission
-    setTimeout(() => {
-      alert(
-        'Formulari enviat correctament! Rebreu una confirmació per correu electrònic.'
-      )
-      // Clear session
+    try {
+      const signatureFile = base64ToFile(clientSignature)
+
+      const fileInfo = await uploadFiles('blobUploader', {
+        files: [signatureFile]
+      })
+
+      const signature = await uploadClientDocument({
+        clientId: kycSession.clientId,
+        value: {
+          name: 'Signatura client',
+          url: fileInfo[0].ufsUrl,
+          type: fileInfo[0].type,
+          size: fileInfo[0].size,
+          isSignature: true,
+          expiresAt: new Date(
+            new Date().setFullYear(new Date().getFullYear() + 100)
+          ).toISOString()
+        }
+      })
+
+      const kycDocument = await createKycDocument({
+        value: submissionData
+      })
+
+      await linkClientDocument({
+        documentId: signature.id,
+        kycId: kycDocument.id
+      })
+
+      if (getFilledNameEntries(relatedPersons).length > 0) {
+        const relatedPersonsWithKycId = relatedPersons.map(p => ({
+          ...p,
+          kycId: kycDocument.id
+        }))
+
+        await createRelatedPersons({
+          value: relatedPersonsWithKycId
+        })
+      }
+
+      toast.success('Formulari enviat correctament')
       localStorage.removeItem('clientSession')
-      window.location.href = '/'
-    }, 2000)
+      navigate({ to: '/' })
+    } catch (error) {
+      console.error(error)
+      toast.error('Error al enviar el formulari')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleSignature = (signature: string) => {
@@ -123,30 +252,36 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
     setShowSignaturePad(false)
   }
 
-  const updatePerson = (
-    type: LegalPersonType | 'related',
-    id: string,
-    field: string,
-    value: string
-  ) => {
-    if (type === 'related') {
-      setClientData(prev => ({
-        ...prev,
-        relatedPersons: prev.relatedPersons.map(p =>
-          p.id === id ? { ...p, [field]: value } : p
-        )
-      }))
-    }
-  }
+  useEffect(() => {
+    if (!clientData || !clientRelatedPersons) return
 
-  const removePerson = (type: LegalPersonType | 'related', id: string) => {
-    if (type === 'related') {
-      setClientData(prev => ({
-        ...prev,
-        relatedPersons: prev.relatedPersons.filter(p => p.id !== id)
-      }))
-    }
-  }
+    setFormData(clientData)
+    setRelatedPersons(clientRelatedPersons)
+  }, [clientData, clientRelatedPersons])
+
+  useEffect(() => {
+    if (!kycSession) return
+
+    setFormData(prev => ({
+      ...prev,
+      fullName: kycSession.clientName || '',
+      email: kycSession.clientEmail || '',
+      phone: kycSession.clientPhone || ''
+    }))
+  }, [kycSession])
+
+  useEffect(() => {
+    if (formData.isRiskySector === 'yes' || !formData.isRiskySector) return
+
+    setFormData(prev => ({
+      ...prev,
+      riskySector: ''
+    }))
+    setClientData?.(prev => ({
+      ...prev,
+      riskySector: ''
+    }))
+  }, [formData.isRiskySector, setClientData])
 
   return (
     <>
@@ -165,9 +300,10 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Label htmlFor="fullName">Nom i Cognoms *</Label>
               <Input
                 id="fullName"
-                value={clientData.fullName}
+                value={formData.fullName || ''}
                 onChange={e => handleInputChange('fullName', e.target.value)}
                 placeholder="Nom i cognoms complets"
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -176,8 +312,9 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Input
                 id="birthDate"
                 type="date"
-                value={clientData.birthDate}
+                value={formData.birthDate || ''}
                 onChange={e => handleInputChange('birthDate', e.target.value)}
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -185,11 +322,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Label htmlFor="birthCountry">País de Naixement *</Label>
               <Input
                 id="birthCountry"
-                value={clientData.birthCountry}
+                value={formData.birthCountry || ''}
                 onChange={e =>
                   handleInputChange('birthCountry', e.target.value)
                 }
                 placeholder="País de naixement"
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -197,21 +335,23 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Label htmlFor="nationality">Nacionalitat *</Label>
               <Input
                 id="nationality"
-                value={clientData.nationality}
+                value={formData.nationality || ''}
                 onChange={e => handleInputChange('nationality', e.target.value)}
                 placeholder="Nacionalitat"
+                disabled={isViewing}
               />
             </InputContainer>
 
             <InputContainer>
               <Label htmlFor="documentType">Tipus de Document *</Label>
               <Select
-                value={clientData.documentType}
+                value={formData.documentType || ''}
                 onValueChange={value =>
                   handleInputChange('documentType', value)
                 }
+                disabled={isViewing}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Tipus de document" />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,21 +365,23 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Label htmlFor="documentNumber">Número de Document *</Label>
               <Input
                 id="documentNumber"
-                value={clientData.documentNumber}
+                value={formData.documentNumber || ''}
                 onChange={e =>
                   handleInputChange('documentNumber', e.target.value)
                 }
                 placeholder="Número del document"
+                disabled={isViewing}
               />
             </InputContainer>
 
             <InputContainer>
               <Label htmlFor="gender">Gènere</Label>
               <Select
-                value={clientData.gender}
+                value={formData.gender || ''}
                 onValueChange={value => handleInputChange('gender', value)}
+                disabled={isViewing}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar gènere" />
                 </SelectTrigger>
                 <SelectContent>
@@ -254,12 +396,13 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 Activitat professional
               </Label>
               <Select
-                value={clientData.professionalActivity}
+                value={formData.professionalActivity || ''}
                 onValueChange={value =>
                   handleInputChange('professionalActivity', value)
                 }
+                disabled={isViewing}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar activitat professional" />
                 </SelectTrigger>
                 <SelectContent>
@@ -288,9 +431,10 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               </Label>
               <Input
                 id="profession"
-                value={clientData.profession}
+                value={formData.profession || ''}
                 onChange={e => handleInputChange('profession', e.target.value)}
                 placeholder="Càrrec ocupat"
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -298,11 +442,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Label htmlFor="maritalStatus">Estat Civil</Label>
               <Input
                 id="maritalStatus"
-                value={clientData.maritalStatus}
+                value={formData.maritalStatus || ''}
                 onChange={e =>
                   handleInputChange('maritalStatus', e.target.value)
                 }
                 placeholder="Estat civil"
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -312,11 +457,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               </Label>
               <Input
                 id="partnerFullName"
-                value={clientData.partnerFullName}
+                value={formData.partnerFullName || ''}
                 onChange={e =>
                   handleInputChange('partnerFullName', e.target.value)
                 }
                 placeholder="Nom i Cognoms de la parella"
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -325,12 +471,13 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 Règim econòmic matrimonial
               </Label>
               <Select
-                value={clientData.maritalEconomicRegime}
+                value={formData.maritalEconomicRegime || ''}
                 onValueChange={value =>
                   handleInputChange('maritalEconomicRegime', value)
                 }
+                disabled={isViewing}
               >
-                <SelectTrigger>
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="Seleccionar règim" />
                 </SelectTrigger>
                 <SelectContent>
@@ -348,9 +495,10 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Label htmlFor="phone">Telèfon de contacte *</Label>
               <Input
                 id="phone"
-                value={clientData.phone}
+                value={formData.phone || ''}
                 onChange={e => handleInputChange('phone', e.target.value)}
                 placeholder="+376 000000"
+                disabled={isViewing}
               />
             </InputContainer>
 
@@ -359,9 +507,10 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               <Input
                 id="email"
                 type="email"
-                value={clientData.email}
+                value={formData.email || ''}
                 onChange={e => handleInputChange('email', e.target.value)}
                 placeholder="correu@exemple.com"
+                disabled={isViewing}
               />
             </InputContainer>
           </div>
@@ -384,11 +533,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="fiscalAddress">Adreça *</Label>
                 <Input
                   id="fiscalAddress"
-                  value={clientData.fiscalAddress}
+                  value={formData.fiscalAddress || ''}
                   onChange={e =>
                     handleInputChange('fiscalAddress', e.target.value)
                   }
                   placeholder="Carrer, número, pis, porta"
+                  disabled={isViewing}
                 />
               </InputContainer>
 
@@ -396,11 +546,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="fiscalPostalCode">Codi Postal</Label>
                 <Input
                   id="fiscalPostalCode"
-                  value={clientData.fiscalPostalCode}
+                  value={formData.fiscalPostalCode || ''}
                   onChange={e =>
                     handleInputChange('fiscalPostalCode', e.target.value)
                   }
                   placeholder="08000"
+                  disabled={isViewing}
                 />
               </InputContainer>
 
@@ -408,11 +559,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="fiscalCity">Localitat *</Label>
                 <Input
                   id="fiscalCity"
-                  value={clientData.fiscalCity}
+                  value={formData.fiscalCity || ''}
                   onChange={e =>
                     handleInputChange('fiscalCity', e.target.value)
                   }
                   placeholder="Localitat"
+                  disabled={isViewing}
                 />
               </InputContainer>
 
@@ -420,11 +572,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="fiscalCountry">País *</Label>
                 <Input
                   id="fiscalCountry"
-                  value={clientData.fiscalCountry}
+                  value={formData.fiscalCountry || ''}
                   onChange={e =>
                     handleInputChange('fiscalCountry', e.target.value)
                   }
                   placeholder="Espanya"
+                  disabled={isViewing}
                 />
               </InputContainer>
             </div>
@@ -440,11 +593,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="postalAddress">Adreça</Label>
                 <Input
                   id="postalAddress"
-                  value={clientData.postalAddress}
+                  value={formData.postalAddress || ''}
                   onChange={e =>
                     handleInputChange('postalAddress', e.target.value)
                   }
                   placeholder="Carrer, número, pis, porta"
+                  disabled={isViewing}
                 />
               </InputContainer>
 
@@ -452,11 +606,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="postalPostalCode">Codi Postal</Label>
                 <Input
                   id="postalPostalCode"
-                  value={clientData.postalPostalCode}
+                  value={formData.postalPostalCode || ''}
                   onChange={e =>
                     handleInputChange('postalPostalCode', e.target.value)
                   }
                   placeholder="08000"
+                  disabled={isViewing}
                 />
               </InputContainer>
 
@@ -464,11 +619,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="postalCity">Localitat</Label>
                 <Input
                   id="postalCity"
-                  value={clientData.postalCity}
+                  value={formData.postalCity || ''}
                   onChange={e =>
                     handleInputChange('postalCity', e.target.value)
                   }
                   placeholder="Localitat"
+                  disabled={isViewing}
                 />
               </InputContainer>
 
@@ -476,11 +632,12 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
                 <Label htmlFor="postalCountry">País</Label>
                 <Input
                   id="postalCountry"
-                  value={clientData.postalCountry}
+                  value={formData.postalCountry || ''}
                   onChange={e =>
                     handleInputChange('postalCountry', e.target.value)
                   }
                   placeholder="Espanya"
+                  disabled={isViewing}
                 />
               </InputContainer>
             </div>
@@ -494,10 +651,11 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
           <div className="flex items-start space-x-2">
             <Checkbox
               id="fundsNotFromMoneyLaundering"
-              checked={clientData.fundsNotFromMoneyLaundering}
+              checked={formData.fundsNotFromMoneyLaundering || false}
               onCheckedChange={checked =>
                 handleInputChange('fundsNotFromMoneyLaundering', checked)
               }
+              disabled={isViewing}
             />
             <Label
               htmlFor="fundsNotFromMoneyLaundering"
@@ -513,16 +671,17 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
             <div className="flex items-start space-x-2">
               <Checkbox
                 id="fundsSource"
-                checked={clientData.fundsSource}
+                checked={formData.fundsSource || false}
                 onCheckedChange={checked => {
                   handleInputChange('fundsSource', checked)
                   if (!checked) {
-                    setClientData(prev => ({
+                    setFormData(prev => ({
                       ...prev,
                       fundsSourceDetails: ''
                     }))
                   }
                 }}
+                disabled={isViewing}
               />
               <Label htmlFor="fundsSource" className="text-sm leading-relaxed">
                 El cient manifesta que els fons emprats pel pagament del serveis
@@ -532,8 +691,8 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
 
             <Input
               id="fundsSourceDetails"
-              disabled={!clientData.fundsSource}
-              value={clientData.fundsSourceDetails}
+              disabled={!formData.fundsSource || isViewing}
+              value={formData.fundsSourceDetails || ''}
               onChange={e =>
                 handleInputChange('fundsSourceDetails', e.target.value)
               }
@@ -544,10 +703,11 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
           <div className="flex items-start space-x-2">
             <Checkbox
               id="actingOnOwnBehalf"
-              checked={clientData.actingOnOwnBehalf}
+              checked={formData.actingOnOwnBehalf || false}
               onCheckedChange={checked =>
                 handleInputChange('actingOnOwnBehalf', checked)
               }
+              disabled={isViewing}
             />
             <Label
               htmlFor="actingOnOwnBehalf"
@@ -563,16 +723,17 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
             <div className="flex items-start space-x-2">
               <Checkbox
                 id="actingOnBehalfOfThirdParty"
-                checked={clientData.actingOnBehalfOfThirdParty}
+                checked={formData.actingOnBehalfOfThirdParty || false}
                 onCheckedChange={checked => {
                   handleInputChange('actingOnBehalfOfThirdParty', checked)
                   if (!checked) {
-                    setClientData(prev => ({
+                    setFormData(prev => ({
                       ...prev,
                       thirdPartyRepresented: ''
                     }))
                   }
                 }}
+                disabled={isViewing}
               />
               <Label
                 htmlFor="actingOnBehalfOfThirdParty"
@@ -585,8 +746,8 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
 
             <Input
               id="thirdPartyRepresented"
-              disabled={!clientData.actingOnBehalfOfThirdParty}
-              value={clientData.thirdPartyRepresented}
+              disabled={!formData.actingOnBehalfOfThirdParty || isViewing}
+              value={formData.thirdPartyRepresented || ''}
               onChange={e =>
                 handleInputChange('thirdPartyRepresented', e.target.value)
               }
@@ -607,10 +768,11 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
         <CardContent className="space-y-6">
           <Textarea
             id="businessPurpose"
-            value={clientData.businessPurpose}
+            value={formData.businessPurpose || ''}
             onChange={e => handleInputChange('businessPurpose', e.target.value)}
             placeholder="Motiu pel que es constitueix societat a Andorra i/o de la relació de negoci amb Ancei Consultoria Estratègica Internacional SA"
             rows={4}
+            disabled={isViewing}
           />
 
           <InputContainer>
@@ -619,8 +781,9 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               vostra activitat professional / laboral?
             </Label>
             <RadioGroup
-              value={clientData.cashUsage}
+              value={formData.cashUsage}
               onValueChange={value => handleInputChange('cashUsage', value)}
+              disabled={isViewing}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="yes" id="cash-usage-yes" />
@@ -639,11 +802,9 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               sectors assenyalats a continuació?
             </Label>
             <RadioGroup
-              value={clientData.isRiskySector}
-              onValueChange={value => {
-                handleInputChange('isRiskySector', value)
-                if (value === 'no') handleInputChange('riskySector', '')
-              }}
+              value={formData.isRiskySector}
+              onValueChange={value => handleInputChange('isRiskySector', value)}
+              disabled={isViewing}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="yes" id="risky-sector-yes" />
@@ -662,9 +823,11 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
             </Label>
             <RadioGroup
               disabled={
-                !clientData.isRiskySector || clientData.isRiskySector === 'no'
+                !formData.isRiskySector ||
+                formData.isRiskySector === 'no' ||
+                isViewing
               }
-              value={clientData.riskySector}
+              value={formData.riskySector}
               onValueChange={value => handleInputChange('riskySector', value)}
               className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
@@ -763,8 +926,9 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               És vostè una persona políticament exposada (PEP)? (*)
             </Label>
             <RadioGroup
-              value={clientData.isPEP}
+              value={formData.isPEP}
               onValueChange={value => handleInputChange('isPEP', value)}
+              disabled={isViewing}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="yes" id="pep-yes" />
@@ -784,8 +948,9 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               empreses públiques?
             </Label>
             <RadioGroup
-              value={clientData.isSelfExposed}
+              value={formData.isSelfExposed}
               onValueChange={value => handleInputChange('isSelfExposed', value)}
+              disabled={isViewing}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="yes" id="self-exposed-yes" />
@@ -807,10 +972,11 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               polític, militar o a empreses públiques?
             </Label>
             <RadioGroup
-              value={clientData.isFamilyExposed}
+              value={formData.isFamilyExposed}
               onValueChange={value =>
                 handleInputChange('isFamilyExposed', value)
               }
+              disabled={isViewing}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="yes" id="family-exposed-yes" />
@@ -830,10 +996,11 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
               polític, militar o a empreses públiques?
             </Label>
             <RadioGroup
-              value={clientData.isAssociatesExposed}
+              value={formData.isAssociatesExposed}
               onValueChange={value =>
                 handleInputChange('isAssociatesExposed', value)
               }
+              disabled={isViewing}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="yes" id="associates-exposed-yes" />
@@ -846,13 +1013,13 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
             </RadioGroup>
           </InputContainer>
 
-          <p className="text-xs text-gray-400">
+          <CardDescription className="text-xs">
             S'entén per persona afí al declarant a qualsevol persona que, de
             manera notòria, participi en el control d´entitats o estructures
             jurídiques conjuntament amb persones que exerceixin o hagin exercit
             una funció o càrrec rellevant de caràcter públic, judicial, polític,
             militar o a empreses públiques.
-          </p>
+          </CardDescription>
 
           <Label className="text-sm font-medium">
             Si alguna de les respostes ha estat SI, detallar el càrrec, les
@@ -860,14 +1027,14 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
             si escau, la vinculació familiar o afí amb el declarant.
           </Label>
 
-          {clientData.relatedPersons.map((person, index) => (
+          {relatedPersons.map((person, index) => (
             <RelatedPersonForm
               key={index}
               person={person}
               index={index}
-              updatePerson={updatePerson}
-              totalPersons={clientData.relatedPersons.length}
-              removePerson={removePerson}
+              updatePerson={updateRelatedPerson}
+              removePerson={removeRelatedPerson}
+              isViewing={isViewing}
             />
           ))}
 
@@ -876,192 +1043,401 @@ export const NaturalClientForm = ({ clientData, setClientData }: Props) => {
             variant="outline"
             className="w-full"
             onClick={() =>
-              setClientData(prev => ({
-                ...prev,
-                relatedPersons: [
-                  ...prev.relatedPersons,
-                  {
-                    id: nanoid(),
-                    fullName: '',
-                    position: '',
-                    period: '',
-                    country: '',
-                    relationship: ''
-                  }
-                ]
-              }))
+              setRelatedPersons([
+                ...relatedPersons,
+                {
+                  id: uuidv4(),
+                  kycId: '',
+                  fullName: '',
+                  position: '',
+                  period: '',
+                  country: '',
+                  relationship: ''
+                }
+              ])
             }
+            disabled={isViewing}
           >
             <Plus className="h-4 w-4 mr-1" />
             Afegir Persona
           </Button>
 
           <div className="flex flex-col gap-1">
-            <p className="text-xs text-gray-400">
+            <CardDescription className="text-xs">
               (*) Quan alguna persona estretament relacionada amb el client
               tingui la consideració de PEP, aquesta haurà d’emplenar un nou
               formulari de coneixement del client (KYC) de persones físiques. El
               client assumeix el compromís d’informar a Ancei Consultoria
               Estratègica Internacional SA de qualsevol modificació que es
               produeixi en relació a si té o no la condició de PEP.
-            </p>
-
-            <p className="text-xs text-gray-400">
+            </CardDescription>
+            <CardDescription className="text-xs">
               (**) No es considerarà que una persona pertany a l’àmbit polític
               quan hagués transcorregut més d´un (1) any des de la data en què
               hagués deixat formalment d’exercir qualsevol de les funcions
               anteriorment expressades.
-            </p>
+            </CardDescription>
           </div>
         </CardContent>
       </Card>
 
-      {/* Declarations and Signature */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <FileText className="w-5 h-5 mr-2" />
-            Declaracions i Signatura
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="authorizedVerification"
-                checked={clientData.authorizedVerification}
-                onCheckedChange={checked =>
-                  handleInputChange('authorizedVerification', checked)
-                }
-              />
-              <Label
-                htmlFor="authorizedVerification"
-                className="text-sm leading-relaxed"
-              >
-                Que tota la informació subministrada en aquest formulari és
-                veraç i certa i AUTORITZO a Ancei Consultoria Estratègica
-                Internacional SA a verificar i, si escau, a ampliar aquestes
-                dades mitjançant les recerques i/o comprovacions que consideri
-                pertinents.
-              </Label>
-            </div>
-
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="noTaxProcedure"
-                checked={clientData.noTaxProcedure}
-                onCheckedChange={checked =>
-                  handleInputChange('noTaxProcedure', checked)
-                }
-              />
-              <Label
-                htmlFor="noTaxProcedure"
-                className="text-sm leading-relaxed"
-              >
-                Que no estic ni he estat part en cap procediment de comprovació
-                o inspecció tributària; en cas, d’estar-ho o haver-ho estat, hem
-                comprometo a aportar tota la documentació relativa al mateix.
-              </Label>
-            </div>
-
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="legalFundsOrigin"
-                checked={clientData.legalFundsOrigin}
-                onCheckedChange={checked =>
-                  handleInputChange('legalFundsOrigin', checked)
-                }
-              />
-              <Label
-                htmlFor="legalFundsOrigin"
-                className="text-sm leading-relaxed"
-              >
-                Que els fons que pugui utilitzar per consumar qualsevol
-                transacció així com l’origen dels fons del meu patrimoni són
-                totalment lícits.
-              </Label>
-            </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h4 className="font-semibold mb-4">Signatura Digital Requerida</h4>
-            {!clientSignature ? (
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Per completar el formulari, heu de proporcionar la vostra
-                  signatura digital.
-                </p>
-                <Button
-                  onClick={() => setShowSignaturePad(true)}
-                  disabled={!hasDeclarations}
-                  className="w-full"
+      {isOcicReview && (
+        <>
+          {/* Due Diligence Measures */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center uppercase">
+                <Shield className="size-5 mr-2" />
+                Mesures de Diligència
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Risk Assessment */}
+              <InputContainer>
+                <Label className="text-sm font-medium">
+                  Valoració del Risc
+                </Label>
+                <RadioGroup
+                  value={formData.riskLevel}
+                  onValueChange={value => handleInputChange('riskLevel', value)}
+                  className="flex gap-3 pt-2"
+                  disabled={isViewing}
                 >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Signar Document
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <p className="text-green-800 font-medium">
-                    Document signat correctament
-                  </p>
-                  <p className="text-sm text-green-600">
-                    Signatura capturada el{' '}
-                    {new Date().toLocaleDateString('ca-ES')}
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="low" id="risk-low" />
+                    <Label htmlFor="risk-low">Risc Baix</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="medium" id="risk-medium" />
+                    <Label htmlFor="risk-medium">Risc Mig</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="high" id="risk-high" />
+                    <Label htmlFor="risk-high">Risc Alt</Label>
+                  </div>
+                </RadioGroup>
+              </InputContainer>
+
+              <Separator />
+
+              <div className="flex flex-col md:flex-row gap-5">
+                {/* Namebook */}
+                <div className="flex flex-col md:flex-row items-center gap-5">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isNamebookChecked"
+                      checked={formData.isNamebookChecked || false}
+                      onCheckedChange={checked => {
+                        const newData = {
+                          ...formData,
+                          isNamebookChecked: checked as boolean,
+                          namebookDate: checked ? formData.namebookDate : ''
+                        }
+                        setFormData(newData)
+                        setClientData?.(newData)
+                      }}
+                      disabled={isViewing}
+                    />
+                    <Label
+                      htmlFor="isNamebookChecked"
+                      className="text-sm font-medium"
+                    >
+                      Namebook
+                    </Label>
+                  </div>
+
+                  <div className="flex gap-3 items-center">
+                    <Label htmlFor="namebookDate">Data:</Label>
+                    <Input
+                      id="namebookDate"
+                      type="date"
+                      value={formData.namebookDate || ''}
+                      onChange={e =>
+                        handleInputChange('namebookDate', e.target.value)
+                      }
+                      disabled={!formData.isNamebookChecked || isViewing}
+                    />
+                  </div>
                 </div>
-                <div className="border rounded-lg p-4 bg-white">
-                  <img
-                    src={clientSignature || '/placeholder.svg'}
-                    alt="Signatura del client"
-                    className="max-h-20"
+
+                {/* Llistat ONU */}
+                <div className="flex flex-col md:flex-row items-center gap-5">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isOnuListChecked"
+                      checked={formData.isOnuListChecked || false}
+                      onCheckedChange={checked => {
+                        const newData = {
+                          ...formData,
+                          isOnuListChecked: checked as boolean,
+                          onuListDate: checked ? formData.onuListDate : ''
+                        }
+                        setFormData(newData)
+                        setClientData?.(newData)
+                      }}
+                      disabled={isViewing}
+                    />
+                    <Label
+                      htmlFor="isOnuListChecked"
+                      className="text-sm font-medium"
+                    >
+                      Llistat ONU
+                    </Label>
+                  </div>
+
+                  <div className="flex gap-3 items-center">
+                    <Label htmlFor="onuListDate">Data:</Label>
+                    <Input
+                      id="onuListDate"
+                      type="date"
+                      value={formData.onuListDate || ''}
+                      onChange={e =>
+                        handleInputChange('onuListDate', e.target.value)
+                      }
+                      disabled={!formData.isOnuListChecked || isViewing}
+                    />
+                  </div>
+                </div>
+
+                {/* Web */}
+                <div className="flex flex-col md:flex-row items-center gap-5">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="isWebChecked"
+                      checked={formData.isWebChecked || false}
+                      onCheckedChange={checked => {
+                        const newData = {
+                          ...formData,
+                          isWebChecked: checked as boolean,
+                          webDate: checked ? formData.webDate : ''
+                        }
+                        setFormData(newData)
+                        setClientData?.(newData)
+                      }}
+                      disabled={isViewing}
+                    />
+                    <Label
+                      htmlFor="isWebChecked"
+                      className="text-sm font-medium"
+                    >
+                      Web
+                    </Label>
+                  </div>
+
+                  <div className="flex gap-3 items-center">
+                    <Label htmlFor="webDate">Data:</Label>
+                    <Input
+                      id="webDate"
+                      type="date"
+                      value={formData.webDate || ''}
+                      onChange={e =>
+                        handleInputChange('webDate', e.target.value)
+                      }
+                      disabled={!formData.isWebChecked || isViewing}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* OCIC Opinion */}
+              <InputContainer>
+                <Label className="text-sm font-medium">Opinió OCIC</Label>
+                <RadioGroup
+                  value={formData.ocicOpinion}
+                  onValueChange={value =>
+                    handleInputChange('ocicOpinion', value)
+                  }
+                  className="flex gap-3 pt-2"
+                  disabled={isViewing}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="favorable" id="ocic-favorable" />
+                    <Label htmlFor="ocic-favorable">Favorable</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="unfavorable" id="ocic-unfavorable" />
+                    <Label htmlFor="ocic-unfavorable">No Favorable</Label>
+                  </div>
+                </RadioGroup>
+              </InputContainer>
+
+              {/* OCIC Comments */}
+              <InputContainer>
+                <Label htmlFor="ocicComments">Comentaris OCIC</Label>
+                <Textarea
+                  id="ocicComments"
+                  value={formData.ocicComments || ''}
+                  onChange={e =>
+                    handleInputChange('ocicComments', e.target.value)
+                  }
+                  placeholder="Escriu aquí els comentaris de l'OCIC..."
+                  rows={4}
+                  className="resize-none"
+                  disabled={isViewing}
+                />
+              </InputContainer>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {isClientSubmit && (
+        <>
+          {/* Declarations and Signature */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <FileText className="w-5 h-5 mr-2" />
+                Declaracions i Signatura
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="authorizedVerification"
+                    checked={formData.authorizedVerification || false}
+                    onCheckedChange={checked =>
+                      handleInputChange('authorizedVerification', checked)
+                    }
+                  />
+                  <Label
+                    htmlFor="authorizedVerification"
+                    className="text-sm leading-relaxed"
+                  >
+                    Que tota la informació subministrada en aquest formulari és
+                    veraç i certa i AUTORITZO a Ancei Consultoria Estratègica
+                    Internacional SA a verificar i, si escau, a ampliar aquestes
+                    dades mitjançant les recerques i/o comprovacions que
+                    consideri pertinents.
+                  </Label>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="noTaxProcedure"
+                    checked={formData.noTaxProcedure || false}
+                    onCheckedChange={checked =>
+                      handleInputChange('noTaxProcedure', checked)
+                    }
+                  />
+                  <Label
+                    htmlFor="noTaxProcedure"
+                    className="text-sm leading-relaxed"
+                  >
+                    Que no estic ni he estat part en cap procediment de
+                    comprovació o inspecció tributària; en cas, d’estar-ho o
+                    haver-ho estat, hem comprometo a aportar tota la
+                    documentació relativa al mateix.
+                  </Label>
+                </div>
+
+                <div className="flex items-start space-x-2">
+                  <Checkbox
+                    id="legalFundsOrigin"
+                    checked={formData.legalFundsOrigin || false}
+                    onCheckedChange={checked =>
+                      handleInputChange('legalFundsOrigin', checked)
+                    }
+                  />
+                  <Label
+                    htmlFor="legalFundsOrigin"
+                    className="text-sm leading-relaxed"
+                  >
+                    Que els fons que pugui utilitzar per consumar qualsevol
+                    transacció així com l’origen dels fons del meu patrimoni són
+                    totalment lícits.
+                  </Label>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h4 className="font-semibold mb-4">
+                  Signatura Digital Requerida
+                </h4>
+                {!clientSignature ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Per completar el formulari, heu de proporcionar la vostra
+                      signatura digital.
+                    </p>
+                    <Button
+                      onClick={() => setShowSignaturePad(true)}
+                      disabled={!hasDeclarations}
+                      className="w-full"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Signar Document
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <p className="text-green-800 font-medium">
+                        Document signat correctament
+                      </p>
+                      <p className="text-sm text-green-600">
+                        Signatura capturada el {new Date().toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="border rounded-lg p-4 bg-white">
+                      <img
+                        src={clientSignature || '/placeholder.svg'}
+                        alt="Signatura del client"
+                        className="max-h-20"
+                      />
+                    </div>
+                    <Button
+                      onClick={() => {
+                        setClientSignature(null)
+                        setShowSignaturePad(true)
+                      }}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Tornar a Signar
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {showSignaturePad && (
+                <div className="border-t pt-6">
+                  <SignaturePad
+                    onSignature={handleSignature}
+                    signerName={formData.fullName || 'Client'}
+                    signerRole="Persona Física"
                   />
                 </div>
-                <Button
-                  onClick={() => {
-                    setClientSignature(null)
-                    setShowSignaturePad(true)
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  Tornar a Signar
-                </Button>
-              </div>
-            )}
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Submit Button */}
+          <div className="flex justify-center pb-8">
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || !clientSignature}
+              size="lg"
+              className="px-8"
+            >
+              {isSubmitting ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Enviant...
+                </>
+              ) : (
+                <>
+                  <Send className="size-4 mr-2" />
+                  Enviar Formulari KYC
+                </>
+              )}
+            </Button>
           </div>
-
-          {showSignaturePad && (
-            <div className="border-t pt-6">
-              <SignaturePad
-                onSignature={handleSignature}
-                signerName={clientData.fullName || 'Client'}
-                signerRole="Persona Física"
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Submit Button */}
-      <div className="flex justify-center pb-8">
-        <Button
-          onClick={handleSubmit}
-          disabled={!isFormValid() || isSubmitting}
-          size="lg"
-          className="px-8"
-        >
-          {isSubmitting ? (
-            'Enviant...'
-          ) : (
-            <>
-              <Send className="w-4 h-4 mr-2" />
-              Enviar Formulari KYC
-            </>
-          )}
-        </Button>
-      </div>
+        </>
+      )}
     </>
   )
 }

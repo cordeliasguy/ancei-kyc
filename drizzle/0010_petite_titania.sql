@@ -1,0 +1,1 @@
+ALTER TABLE "client_documents" ADD COLUMN "is_signature" boolean DEFAULT false NOT NULL;

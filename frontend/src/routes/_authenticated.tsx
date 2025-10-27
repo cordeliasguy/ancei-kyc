@@ -1,4 +1,4 @@
-import { userQueryOptions } from '@/lib/api'
+import { getUserQueryOptions } from '@/lib/api'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated')({
@@ -6,7 +6,7 @@ export const Route = createFileRoute('/_authenticated')({
     const { queryClient } = context
 
     try {
-      const data = await queryClient.fetchQuery(userQueryOptions)
+      const data = await queryClient.fetchQuery(getUserQueryOptions)
       return data
     } catch {
       throw redirect({

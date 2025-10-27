@@ -1,20 +1,23 @@
 import { Hono } from 'hono'
-import { serveStatic } from 'hono/bun'
 import { cors } from 'hono/cors'
+import { serveStatic } from 'hono/bun'
 
 import { auth } from './lib/auth'
-
+import { authRoute } from './routes/auth'
+import { kycRoute } from './routes/kyc'
+import { usersRoute } from './routes/users'
 import { clientsRoute } from './routes/clients'
 import { agenciesRoute } from './routes/agencies'
-import { usersRoute } from './routes/users'
-import { authRoute } from './routes/auth'
+
+import { createRouteHandler } from 'uploadthing/server'
+import { fileRouter } from './uploadthing'
 
 const app = new Hono()
 
 // CORS configuration - allow both dev and prod origins
 const allowedOrigins = [
   'http://localhost:5173', // Development
-  'https://near-barbaraanne-cordelia-e5f335b6.koyeb.app' // Production
+  'https://convinced-sophronia-cordelia-38f9cb9e.koyeb.app' // Production
 ]
 
 app.use(
@@ -25,6 +28,16 @@ app.use(
   })
 )
 
+// UploadThing routes
+const handlers = createRouteHandler({
+  router: fileRouter,
+  config: {
+    token: import.meta.env.UPLOADTHING_TOKEN
+  }
+})
+
+app.all('/api/uploadthing', context => handlers(context.req.raw))
+
 // Mount Better Auth routes
 app.on(['POST', 'GET'], '/api/auth/*', c => {
   return auth.handler(c.req.raw)
@@ -32,10 +45,11 @@ app.on(['POST', 'GET'], '/api/auth/*', c => {
 
 const apiRoutes = app
   .basePath('/api')
+  .route('/', authRoute)
+  .route('/kyc', kycRoute)
+  .route('/users', usersRoute)
   .route('/clients', clientsRoute)
   .route('/agencies', agenciesRoute)
-  .route('/users', usersRoute)
-  .route('/', authRoute)
 
 app.use('*', serveStatic({ root: './frontend/dist' }))
 app.use('*', serveStatic({ path: './frontend/dist/index.html' }))

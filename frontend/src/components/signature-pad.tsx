@@ -2,14 +2,7 @@ import type React from 'react'
 
 import { useRef, useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle
-} from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
+import { Card, CardContent } from '@/components/ui/card'
 import { RotateCcw, Check } from 'lucide-react'
 
 interface SignaturePadProps {
@@ -143,21 +136,10 @@ export function SignaturePad({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Digital Signature</CardTitle>
-        <CardDescription>
-          Please sign below to confirm your review and approval
-        </CardDescription>
-      </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label className="text-sm font-medium text-gray-600">
-            Signer Information
-          </Label>
-          <div className="mt-1">
-            <p className="font-semibold">{signerName}</p>
-            <p className="text-sm text-gray-600">{signerRole}</p>
-          </div>
+          <p className="font-semibold">{signerName}</p>
+          <p className="text-sm text-gray-600">{signerRole}</p>
         </div>
 
         <div className="border-2 border-gray-300 rounded-lg p-4 bg-white">
@@ -174,7 +156,7 @@ export function SignaturePad({
             onTouchEnd={stopDrawing}
           />
           <p className="text-xs text-gray-500 mt-2 text-center">
-            Sign above using your mouse or finger
+            Signa a sobre amb el ratolí o amb el dit
           </p>
         </div>
 
@@ -185,22 +167,22 @@ export function SignaturePad({
             disabled={!hasSignature}
             className="flex-1 bg-transparent"
           >
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Clear
+            <RotateCcw className="size-4 mr-1" />
+            Neteja
           </Button>
           <Button
             onClick={saveSignature}
             disabled={!hasSignature}
             className="flex-1"
           >
-            <Check className="w-4 h-4 mr-2" />
-            Sign & Approve
+            <Check className="size-4 mr-1" />
+            Signa i aprova
           </Button>
         </div>
 
         <div className="text-xs text-gray-500 text-center">
-          By signing, you confirm that you have reviewed all information and
-          approve this document.
+          En signar, confirmes que has revisat tota la informació i que aproves
+          aquest document.
         </div>
       </CardContent>
     </Card>

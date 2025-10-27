@@ -1,46 +1,37 @@
 # syntax = docker/dockerfile:1
 
 # Adjust BUN_VERSION as desired
-ARG BUN_VERSION=1.1.13
+ARG BUN_VERSION=1.2.19
 FROM oven/bun:${BUN_VERSION}-slim AS base
 
-# Bun app lives here
 WORKDIR /app
+ENV NODE_ENV=production
 
-# Set production environment
-ENV NODE_ENV="production"
-
-# Throw-away build stage to reduce size of final image
+# --- build stage ----------------------------------------------------
 FROM base AS build
 
-# Install packages needed to build node modules
 RUN apt-get update -qq && \
-    apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
+    apt-get install --no-install-recommends -y \
+        build-essential node-gyp pkg-config python-is-python3
 
-# Install node modules
-COPY --link bun.lockb package.json ./
+# install root deps
+COPY --link bun.lock package.json ./
 RUN bun install --ci
 
-# Install frontend node modules
-COPY --link frontend/bun.lockb frontend/package.json ./frontend/
+# install frontend deps
+COPY --link frontend/bun.lock frontend/package.json ./frontend/
 RUN cd frontend && bun install --ci
 
-# Copy application code
+# build the app
 COPY --link . .
-
-# Change to frontend directory and build the frontend app
 WORKDIR /app/frontend
 RUN bun run build
 
-# Remove all files in frontend except for the dist folder
+# keep only the dist folder
 RUN find . -mindepth 1 ! -regex '^./dist\(/.*\)?' -delete
 
-# Final stage for app image
+# --- runtime stage ---------------------------------------------------
 FROM base
-
-# Copy built application
 COPY --from=build /app /app
-
-# Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
-CMD [ "bun", "run", "start" ]
+CMD ["bun", "run", "start"]

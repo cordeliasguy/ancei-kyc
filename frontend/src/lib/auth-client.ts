@@ -3,5 +3,5 @@ import { createAuthClient } from 'better-auth/react'
 export const authClient = createAuthClient({
   baseURL: import.meta.env.DEV
     ? 'http://localhost:3000'
-    : 'https://near-barbaraanne-cordelia-e5f335b6.koyeb.app'
+    : 'https://convinced-sophronia-cordelia-38f9cb9e.koyeb.app/'
 })

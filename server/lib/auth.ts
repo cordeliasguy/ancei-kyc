@@ -4,6 +4,7 @@ import { db } from '../db'
 import { user, account, session, verification } from '../db/schema/auth'
 import { createMiddleware } from 'hono/factory'
 import type { User } from 'better-auth/types'
+import type { UserRole } from '../sharedTypes'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -15,9 +16,28 @@ export const auth = betterAuth({
       verification
     }
   }),
+  user: {
+    additionalFields: {
+      agencyId: {
+        type: 'string',
+        required: true,
+        input: true
+      },
+      role: {
+        type: 'string',
+        required: true,
+        input: true,
+        defaultValue: 'responsible' as UserRole
+      }
+    },
+    deleteUser: {
+      enabled: true
+    }
+  },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false
+    requireEmailVerification: false,
+    autoSignIn: false
   },
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
@@ -28,15 +48,22 @@ export const auth = betterAuth({
     }
   },
   secret: process.env.BETTER_AUTH_SECRET!,
-  baseURL: process.env.BETTER_AUTH_URL!
+  baseURL: process.env.BETTER_AUTH_URL!,
+  trustedOrigins: [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'https://convinced-sophronia-cordelia-38f9cb9e.koyeb.app'
+  ]
 })
 
 type Env = {
   Variables: {
-    user: User
+    user: User & {
+      agencyId: string
+      role: string
+    }
   }
 }
-
 export const getUser = createMiddleware<Env>(async (ctx, next) => {
   try {
     const data = await auth.api.getSession({

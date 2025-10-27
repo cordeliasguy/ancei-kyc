@@ -1,5 +1,6 @@
 import { pgTable, text, timestamp, boolean, uuid } from 'drizzle-orm/pg-core'
 import { agencies } from './agencies'
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -66,3 +67,6 @@ export const verification = pgTable('verification', {
     () => /* @__PURE__ */ new Date()
   )
 })
+
+export const selectUserSchema = createSelectSchema(user)
+export const insertUserSchema = createInsertSchema(user)

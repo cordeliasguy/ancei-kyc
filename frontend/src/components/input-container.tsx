@@ -5,5 +5,7 @@ export const InputContainer = ({
   children: React.ReactNode
   className?: string
 }) => {
-  return <div className={`flex flex-col gap-1 ${className}`}>{children}</div>
+  return (
+    <div className={`flex flex-col gap-1 ${className ?? ''}`}>{children}</div>
+  )
 }

@@ -1,171 +1,257 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import { z } from 'zod'
-
-const baseFields = {
-  id: z.number(),
-  name: z.string(),
-  address: z.string(),
-  economicActivity: z.string(),
-  fundsOrigin: z.string(),
-  requestedServices: z.array(z.string()),
-  isPEP: z.boolean(),
-  pepDetails: z.string().optional(),
-  pepRelation: z.string().optional(),
-  files: z
-    .array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        type: z.string(),
-        size: z.number(),
-        uploadedAt: z.string(),
-        content: z.string().optional()
-      })
-    )
-    .optional(),
-  createdAt: z.string(), // ISO string assumed
-  updatedAt: z.string() // ISO string assumed
-}
-
-const legalClientSchema = z.object({
-  type: z.literal('legal'),
-  representatives: z.array(
-    z.object({
-      name: z.string(),
-      role: z.string()
-    })
-  ),
-  beneficiaries: z.array(
-    z.object({
-      name: z.string(),
-      directPercentage: z.number(),
-      indirectPercentage: z.number()
-    })
-  ),
-  operatingCountries: z.array(z.string()),
-  ...baseFields
-})
-
-const naturalClientSchema = z.object({
-  type: z.literal('natural'),
-  countryOfResidence: z.string(),
-  nationalities: z.array(z.string()),
-  email: z.string().email(),
-  phone: z.string(),
-  language: z.string(),
-  ...baseFields
-})
-
-const clientSchema = z.discriminatedUnion('type', [
-  legalClientSchema,
-  naturalClientSchema
-])
-
-const createLegalClientSchema = legalClientSchema.omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true
-})
-
-const createNaturalClientSchema = naturalClientSchema.omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true
-})
-
-const createClientSchema = z.discriminatedUnion('type', [
-  createLegalClientSchema,
-  createNaturalClientSchema
-])
-
-export type Client = z.infer<typeof clientSchema>
-
-const fakeClients: Client[] = [
-  {
-    id: 1,
-    type: 'natural',
-    name: 'Alice Smith',
-    address: '123 Elm Street, Springfield',
-    countryOfResidence: 'USA',
-    nationalities: ['USA', 'Canada'],
-    email: 'alice@example.com',
-    phone: '+1-555-1234',
-    language: 'en',
-    economicActivity: 'Freelance Designer',
-    fundsOrigin: 'Personal savings',
-    requestedServices: ['Checking Account', 'Investment Advice'],
-    isPEP: false,
-    pepDetails: undefined,
-    pepRelation: undefined,
-    createdAt: '2024-06-01T10:00:00Z',
-    updatedAt: '2024-06-15T14:30:00Z'
-  },
-  {
-    id: 2,
-    type: 'legal',
-    name: 'TechCorp LLC',
-    address: '456 Industrial Rd, Metropolis',
-    representatives: [
-      { name: 'John Businessman', role: 'CEO' },
-      { name: 'Mary Accountant', role: 'CFO' }
-    ],
-    beneficiaries: [
-      {
-        name: 'Global Holdings Ltd.',
-        directPercentage: 60,
-        indirectPercentage: 0
-      },
-      {
-        name: 'Venture Group Inc.',
-        directPercentage: 20,
-        indirectPercentage: 20
-      }
-    ],
-    operatingCountries: ['USA', 'Germany', 'Japan'],
-    economicActivity: 'Software Development',
-    fundsOrigin: 'Private capital and venture funding',
-    requestedServices: ['Corporate Account', 'Foreign Exchange'],
-    isPEP: true,
-    pepDetails: 'Major shareholder is a politically exposed person.',
-    pepRelation: 'Shareholder is the brother of a minister',
-    createdAt: '2024-01-12T08:45:00Z',
-    updatedAt: '2024-06-10T12:00:00Z'
-  }
-]
+import { getUser } from '../lib/auth'
+import { db } from '../db'
+import {
+  clients as clientsTable,
+  clientDocuments as clientDocumentsTable,
+  insertClientDocumentsSchema,
+  insertClientsSchema
+} from '../db/schema/clients'
+import { and, desc, eq } from 'drizzle-orm'
+import {
+  createClientDocumentSchema,
+  createClientSchema,
+  updateClientSchema
+} from '../sharedTypes'
+import { utapi } from '../uploadthing'
+import {
+  insertKycDocumentFilesSchema,
+  kycDocumentFiles as kycDocumentFilesTable,
+  kycDocuments as kycDocumentsTable
+} from '../db/schema'
 
 export const clientsRoute = new Hono()
-  .get('/', c => {
-    return c.json({
-      clients: fakeClients
-    })
+  .get('/', getUser, async ctx => {
+    const agencyId = ctx.var.user.agencyId
+
+    const clients = await db
+      .select()
+      .from(clientsTable)
+      .where(eq(clientsTable.agencyId, agencyId))
+      .orderBy(desc(clientsTable.createdAt))
+      .limit(100)
+
+    return ctx.json({ clients })
   })
-  .post('/', zValidator('json', createClientSchema), c => {
-    const client = c.req.valid('json')
-    fakeClients.push({
+  .get('/with-documents', getUser, async ctx => {
+    const agencyId = ctx.var.user.agencyId
+
+    const clients = await db.query.clients.findMany({
+      where: eq(clientsTable.agencyId, agencyId),
+      with: {
+        documents: true // eager load documents[]
+      },
+      orderBy: (clients, { desc }) => [desc(clients.createdAt)],
+      limit: 100
+    })
+
+    return ctx.json({ clients })
+  })
+  .post('/', getUser, zValidator('json', createClientSchema), async ctx => {
+    const client = ctx.req.valid('json')
+    const user = ctx.var.user
+
+    const validatedClient = insertClientsSchema.parse({
       ...client,
-      id: fakeClients.length + 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      agencyId: user.agencyId
     })
 
-    return c.json(client, { status: 201 })
+    const result = await db
+      .insert(clientsTable)
+      .values(validatedClient)
+      .returning()
+      .then(res => res[0])
+
+    return ctx.json(result, { status: 201 })
   })
-  .get('/:id{[0-9]+}', c => {
-    const id = Number.parseInt(c.req.param('id'))
-    const client = fakeClients.find(client => client.id === id)
+  .get('/:id{[0-9a-fA-F-]{36}}', async ctx => {
+    const id = ctx.req.param('id')
 
-    if (!client) return c.notFound()
+    const client = await db
+      .select()
+      .from(clientsTable)
+      .where(eq(clientsTable.id, id))
+      .then(res => res[0])
 
-    return c.json(client)
+    if (!client) return ctx.notFound()
+
+    return ctx.json({ client })
   })
-  .delete('/:id{[0-9]+}', c => {
-    const id = Number.parseInt(c.req.param('id'))
-    const client = fakeClients.find(client => client.id === id)
+  .patch(
+    '/:id{[0-9a-fA-F-]{36}}',
+    getUser,
+    zValidator('json', updateClientSchema),
+    async ctx => {
+      const id = ctx.req.param('id')
 
-    if (!client) return c.notFound()
+      const validatedClient = updateClientSchema.parse(ctx.req.valid('json'))
 
-    fakeClients.splice(fakeClients.indexOf(client), 1)
+      const result = await db
+        .update(clientsTable)
+        .set(validatedClient)
+        .where(eq(clientsTable.id, id))
+        .returning()
+        .then(res => res[0])
 
-    return c.json({ message: 'Client deleted' })
+      return ctx.json(result, { status: 200 })
+    }
+  )
+  .delete('/:id{[0-9a-fA-F-]{36}}', getUser, async ctx => {
+    const id = ctx.req.param('id')
+    const user = ctx.var.user
+
+    // Get the client's documents
+    const documentsUrls = await db
+      .select()
+      .from(clientDocumentsTable)
+      .where(eq(clientDocumentsTable.clientId, id))
+      .then(res => res.map(doc => doc.url))
+
+    // Delete the client's documents from uploadthing
+    await utapi.deleteFiles(
+      documentsUrls.map(url => url.split('/').filter(Boolean).pop() || '')
+    )
+
+    // Delete the client from the database
+    const client = await db
+      .delete(clientsTable)
+      .where(
+        and(eq(clientsTable.agencyId, user.agencyId), eq(clientsTable.id, id))
+      )
+      .returning()
+      .then(res => res[0])
+
+    if (!client) return ctx.notFound()
+
+    return ctx.json({ client })
   })
+  .get('/:clientId{[0-9a-fA-F-]{36}}/documents', getUser, async ctx => {
+    const clientId = ctx.req.param('clientId')
+
+    const documents = await db
+      .select()
+      .from(clientDocumentsTable)
+      .where(eq(clientDocumentsTable.clientId, clientId))
+      .orderBy(desc(clientDocumentsTable.uploadedAt))
+      .limit(100)
+
+    return ctx.json({ documents })
+  })
+  .get('/:clientId{[0-9a-fA-F-]{36}}/kycs', getUser, async ctx => {
+    const clientId = ctx.req.param('clientId')
+
+    const kycs = await db
+      .select()
+      .from(kycDocumentsTable)
+      .where(eq(kycDocumentsTable.clientId, clientId))
+      .orderBy(desc(kycDocumentsTable.createdAt))
+      .limit(100)
+
+    return ctx.json({ kycs })
+  })
+  .post(
+    '/:clientId{[0-9a-fA-F-]{36}}/document',
+    getUser,
+    zValidator('json', createClientDocumentSchema),
+    async ctx => {
+      const document = ctx.req.valid('json')
+      const clientId = ctx.req.param('clientId')
+
+      const validatedDocument = insertClientDocumentsSchema.parse({
+        ...document,
+        clientId
+      })
+
+      const result = await db
+        .insert(clientDocumentsTable)
+        .values(validatedDocument)
+        .returning()
+        .then(res => res[0])
+
+      return ctx.json(result, { status: 201 })
+    }
+  )
+  .get('/:documentId{[0-9a-fA-F-]{36}}/linked', getUser, async ctx => {
+    const documentId = ctx.req.param('documentId')
+
+    const linkedDocuments = await db
+      .select()
+      .from(kycDocumentFilesTable)
+      .where(eq(kycDocumentFilesTable.documentId, documentId))
+      .orderBy(desc(kycDocumentFilesTable.linkedAt))
+      .limit(100)
+
+    return ctx.json({ linkedDocuments })
+  })
+  .post(
+    '/:documentId{[0-9a-fA-F-]{36}}/:kycId{[0-9a-fA-F-]{36}}/link',
+    async ctx => {
+      const documentId = ctx.req.param('documentId')
+      const kycId = ctx.req.param('kycId')
+
+      const validatedEntry = insertKycDocumentFilesSchema.parse({
+        kycDocumentId: kycId,
+        documentId: documentId
+      })
+
+      const result = await db
+        .insert(kycDocumentFilesTable)
+        .values(validatedEntry)
+        .returning()
+        .then(res => res[0])
+
+      return ctx.json(result, { status: 201 })
+    }
+  )
+  .delete(
+    '/:documentId{[0-9a-fA-F-]{36}}/:kycId{[0-9a-fA-F-]{36}}/unlink',
+    async ctx => {
+      const documentId = ctx.req.param('documentId')
+      const kycId = ctx.req.param('kycId')
+
+      const result = await db
+        .delete(kycDocumentFilesTable)
+        .where(
+          and(
+            eq(kycDocumentFilesTable.documentId, documentId),
+            eq(kycDocumentFilesTable.kycDocumentId, kycId)
+          )
+        )
+        .returning()
+        .then(res => res[0])
+
+      if (!result) return ctx.notFound()
+
+      return ctx.json(result, { status: 200 })
+    }
+  )
+  .delete(
+    '/:clientId{[0-9a-fA-F-]{36}}/document/:documentId{[0-9a-fA-F-]{36}}',
+    getUser,
+    async ctx => {
+      const clientId = ctx.req.param('clientId')
+      const documentId = ctx.req.param('documentId')
+
+      // Delete the document from the database
+      const document = await db
+        .delete(clientDocumentsTable)
+        .where(
+          and(
+            eq(clientDocumentsTable.clientId, clientId),
+            eq(clientDocumentsTable.id, documentId)
+          )
+        )
+        .returning()
+        .then(res => res[0])
+
+      if (!document) return ctx.notFound()
+
+      // Delete the document from the uploadthing bucket
+      await utapi.deleteFiles(
+        document.url.split('/').filter(Boolean).pop() || ''
+      )
+
+      return ctx.json({ document })
+    }
+  )

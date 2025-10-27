@@ -1,0 +1,1 @@
+ALTER TABLE "client_documents" ALTER COLUMN "expires_at" SET DATA TYPE date;

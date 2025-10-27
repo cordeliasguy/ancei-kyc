@@ -29,152 +29,97 @@ import {
   FileText,
   Building,
   User,
-  Clock,
   LogIn,
   LayoutDashboard
 } from 'lucide-react'
-// import { api } from '@/lib/api'
-// import { useQuery } from '@tanstack/react-query'
-// import type { Agency } from '@/lib/types'
-import { useAuth } from '@/hooks/useAuth'
+import { authClient } from '@/lib/auth-client'
+import { getClientById } from '@/lib/api'
+import type { Client } from '@server/sharedTypes'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Spinner } from '@/components/ui/spinner'
 
-interface Client {
-  code: string
-  name: string
-  email: string
-  type: 'natural' | 'legal'
-  status: 'active' | 'inactive'
-  lastKyc?: string
-  kycHistory: Array<{
-    id: string
-    date: string
-    service: string
-    status: string
-  }>
-}
+const SERVICES = [
+  { value: 'corporate_accounting', label: 'Comptabilitat de societats' },
+  { value: 'immigration', label: 'Immigració' },
+  { value: 'company_formation', label: 'Creació de societats' },
+  { value: 'personal_income_tax', label: 'IRPF' },
+  { value: 'coworking', label: 'Coworking' }
+]
 
 export const Route = createFileRoute('/')({
   component: Index
 })
 
-// async function getAllAgencies() {
-//   const res = await api.agencies.$get()
-
-//   if (!res.ok) throw new Error('Failed to fetch agencies')
-
-//   const data = await res.json()
-//   return data.agencies
-// }
-
-// async function getAgencyById({ id }: { id: string }) {
-//   const res = await api.agencies[':id'].$get({ param: { id } })
-
-//   if (!res.ok) throw new Error('Failed to fetch agency')
-
-//   const data = (await res.json()) as { agency: Agency }
-//   return data.agency
-// }
-
 function Index() {
   const navigate = useNavigate()
 
-  const { data: session } = useAuth()
+  const { data: session, isPending } = authClient.useSession()
 
-  // const { isPending, error, data } = useQuery({
-  //   queryKey: ['agency'],
-  //   queryFn: () => getAgencyById({ id: '0cdc23ef-0673-493d-88f3-ca974ceb127c' })
-  // })
-
-  const [clientCode, setClientCode] = useState('')
-  const [serviceType, setServiceType] = useState('')
-  const [serviceFrequency, setServiceFrequency] = useState('')
-  const [validatedClient, setValidatedClient] = useState<Client | null>(null)
+  const [clientId, setClientId] = useState('')
   const [isValidating, setIsValidating] = useState(false)
+  const [validatedClient, setValidatedClient] = useState<Client | null>(null)
+  const [error, setError] = useState('')
+
   const [showClientDialog, setShowClientDialog] = useState(false)
 
-  // Mock client database
-  const mockClients: Record<string, Client> = {
-    'CLI-001': {
-      code: 'CLI-001',
-      name: 'Maria García López',
-      email: 'maria.garcia@email.com',
-      type: 'natural',
-      status: 'active',
-      lastKyc: '2024-01-15',
-      kycHistory: [
-        {
-          id: 'KYC-001',
-          date: '2024-01-15',
-          service: 'Tax Advisory',
-          status: 'pending_review'
-        }
-      ]
-    },
-    'CLI-002': {
-      code: 'CLI-002',
-      name: 'Consultoria Tech SL',
-      email: 'info@consultoriatech.com',
-      type: 'legal',
-      status: 'active',
-      lastKyc: '2024-01-13',
-      kycHistory: [
-        {
-          id: 'KYC-003',
-          date: '2024-01-13',
-          service: 'Business Setup',
-          status: 'compliance_review'
-        }
-      ]
-    },
-    'CLI-003': {
-      code: 'CLI-003',
-      name: 'Joan Martínez Vila',
-      email: 'joan.martinez@email.com',
-      type: 'natural',
-      status: 'active',
-      lastKyc: '2024-01-14',
-      kycHistory: [
-        {
-          id: 'KYC-002',
-          date: '2024-01-14',
-          service: 'Legal Consultation',
-          status: 'business_review'
-        }
-      ]
+  const [selectedServices, setSelectedServices] = useState<
+    { service: string; frequency: 'One-time' | 'Recurring' | '' }[]
+  >([])
+
+  const toggleService = (service: string) => {
+    setSelectedServices(prev => {
+      // if service already exists, remove it
+      if (prev.some(s => s.service === service)) {
+        return prev.filter(s => s.service !== service)
+      }
+      // otherwise add it with empty frequency
+      return [...prev, { service, frequency: '' }]
+    })
+  }
+
+  const updateFrequency = (
+    service: string,
+    frequency: 'One-time' | 'Recurring'
+  ) => {
+    setSelectedServices(prev =>
+      prev.map(s => (s.service === service ? { ...s, frequency } : s))
+    )
+  }
+
+  const handleValidateClient = async () => {
+    setIsValidating(true)
+    setError('')
+
+    try {
+      const client = await getClientById({ id: clientId.trim() })
+
+      setValidatedClient(client)
+      setShowClientDialog(true)
+    } catch (error) {
+      setError(
+        'Codi de client no trobat. Si us plau, contacta amb el teu consultor.'
+      )
+      console.error(error)
+    } finally {
+      setIsValidating(false)
     }
   }
 
-  const handleValidateClient = () => {
-    setIsValidating(true)
-
-    // Simulate API call
-    setTimeout(() => {
-      const client = mockClients[clientCode.toUpperCase()]
-      if (client && client.status === 'active') {
-        setValidatedClient(client)
-        setShowClientDialog(true)
-      } else {
-        alert(
-          'Client code not found or inactive. Please contact your consultant.'
-        )
-      }
-      setIsValidating(false)
-    }, 1000)
-  }
-
   const handleStartKyc = () => {
-    if (!validatedClient || !serviceType) return
+    if (!validatedClient || !selectedServices) return
 
     // Store client session data
     sessionStorage.setItem(
       'clientSession',
       JSON.stringify({
-        clientCode: validatedClient.code,
-        clientName: validatedClient.name,
+        clientId: validatedClient.id,
+        clientName: validatedClient.fullName,
         clientEmail: validatedClient.email,
         clientType: validatedClient.type,
-        serviceType: serviceType,
-        consultancy: 'Ancei Consultoria Estratègica Internacional SA'
+        clientPhone: validatedClient.phone,
+        services: selectedServices,
+        agencyId: validatedClient.agencyId
       })
     )
 
@@ -186,51 +131,6 @@ function Index() {
     }
   }
 
-  // const getStatusBadge = (status: string) => {
-  //   switch (status) {
-  //     case 'pending_review':
-  //       return (
-  //         <Badge variant="secondary">
-  //           <Clock className="w-3 h-3 mr-1" />
-  //           Pending
-  //         </Badge>
-  //       )
-  //     case 'business_review':
-  //       return (
-  //         <Badge variant="default" className="bg-blue-600">
-  //           Business Review
-  //         </Badge>
-  //       )
-  //     case 'compliance_review':
-  //       return (
-  //         <Badge variant="default" className="bg-orange-600">
-  //           Compliance
-  //         </Badge>
-  //       )
-  //     case 'sent_to_government':
-  //       return (
-  //         <Badge variant="default" className="bg-indigo-600">
-  //           Sent to Gov
-  //         </Badge>
-  //       )
-  //     case 'approved':
-  //       return (
-  //         <Badge variant="default" className="bg-green-600">
-  //           <CheckCircle className="w-3 h-3 mr-1" />
-  //           Approved
-  //         </Badge>
-  //       )
-  //     default:
-  //       return <Badge variant="secondary">Unknown</Badge>
-  //   }
-  // }
-
-  // if (error) return 'An error has occurred: ' + error.message
-
-  // if (isPending) return 'Loading...'
-
-  // console.log('DATA: ', data)
-
   const handleOnLogin = () => {
     if (session) {
       navigate({ to: '/company/dashboard' })
@@ -239,16 +139,20 @@ function Index() {
     }
   }
 
+  const isReady =
+    selectedServices.length > 0 &&
+    selectedServices.every(s => s.frequency !== '')
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            KYC Document Management System
+            Sistema de Gestió de Documents KYC
           </h1>
           <p className="text-lg text-gray-500 max-w-2xl mx-auto">
-            Secure and efficient Know Your Customer (KYC) document processing
-            for compliance and regulatory requirements
+            Processament segur i eficient de documents Know Your Customer (KYC)
+            per a requisits de compliment normatiu i regulatori
           </p>
         </div>
 
@@ -257,54 +161,56 @@ function Index() {
           <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 text-white py-6 rounded-t-xl">
             <CardTitle className="flex items-center text-xl">
               <FileText className="w-6 h-6 mr-3" />
-              Submit KYC Document
+              Enviar Document KYC
             </CardTitle>
             <CardDescription className="text-blue-100">
-              Complete your Know Your Customer documentation
+              Completa la teva documentació Know Your Customer
             </CardDescription>
           </CardHeader>
           <CardContent className="p-6 space-y-6">
             <div className="space-y-4">
               <div>
-                <Label htmlFor="clientCode">Client Code</Label>
+                <Label htmlFor="clientId">Codi de Client</Label>
                 <Input
-                  id="clientCode"
-                  placeholder="Enter your client code (e.g., CLI-001)"
-                  value={clientCode}
-                  onChange={e => setClientCode(e.target.value)}
+                  id="clientId"
+                  placeholder="Introdueix el teu codi de client"
+                  value={clientId}
+                  onChange={e => setClientId(e.target.value)}
                   className="mt-1"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  Your client code was provided by your consultant
+                  El teu codi de client t'ha estat proporcionat pel teu
+                  consultor
                 </p>
               </div>
 
-              <Button
-                onClick={handleValidateClient}
-                disabled={!clientCode || isValidating}
-                className="w-full cursor-pointer"
-              >
-                {isValidating ? (
-                  <>
-                    <Clock className="w-4 h-4 mr-2 animate-spin" />
-                    Validating...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4 mr-2" />
-                    Validate Client Code
-                  </>
-                )}
-              </Button>
+              <div>
+                <Button
+                  onClick={handleValidateClient}
+                  disabled={!clientId || isValidating}
+                  className="w-full cursor-pointer"
+                >
+                  {isValidating ? (
+                    <>
+                      <Spinner className="mr-2" />
+                      Validant...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="size-4 mr-2" />
+                      Validar Codi de Client
+                    </>
+                  )}
+                </Button>
+
+                {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
+              </div>
             </div>
 
             <div className="pt-4 border-t">
-              <h4 className="font-semibold mb-2">What you'll need:</h4>
+              <h4 className="font-semibold mb-2">Què necessitaràs:</h4>
               <ul className="text-sm text-gray-600 space-y-1">
-                <li>• Valid client code from your consultant</li>
-                {/* <li>• Personal identification documents</li>
-                <li>• Proof of address</li>
-                <li>• Additional documents based on service type</li> */}
+                <li>• Codi de client vàlid del teu consultor</li>
               </ul>
             </div>
           </CardContent>
@@ -316,9 +222,9 @@ function Index() {
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Building className="w-8 h-8 text-blue-600" />
             </div>
-            <CardTitle>Company Portal</CardTitle>
+            <CardTitle>Portal d'Empresa</CardTitle>
             <CardDescription>
-              Internal staff access for document review
+              Accés per al personal intern per a la revisió de documents
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -326,105 +232,137 @@ function Index() {
               variant="outline"
               className="w-full bg-transparent cursor-pointer"
               onClick={handleOnLogin}
+              disabled={isPending}
             >
-              {session ? (
+              {isPending ? (
+                <Spinner className="size-4 mr-1" />
+              ) : session ? (
                 <LayoutDashboard className="size-4 mr-1" />
               ) : (
                 <LogIn className="size-4 mr-1" />
               )}
-              {session ? 'Dashboard' : 'Login'}
+              {isPending
+                ? 'Carregant...'
+                : session
+                  ? 'Tauler'
+                  : 'Iniciar sessió'}
             </Button>
           </CardContent>
         </Card>
 
         {/* Client Validation Dialog */}
         <Dialog open={showClientDialog} onOpenChange={setShowClientDialog}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Client Validated Successfully</DialogTitle>
+              <DialogTitle>Client Validat Correctament</DialogTitle>
               <DialogDescription>
-                Please select the service type for your KYC submission
+                Si us plau, selecciona el(s) tipus de servei i la freqüència per
+                a la teva sol·licitud KYC
               </DialogDescription>
             </DialogHeader>
+
             {validatedClient && (
               <div className="space-y-4">
-                <div className="p-4 bg-green-50 rounded-lg">
+                {/* Client Card */}
+                <div className="p-4 bg-green-50 flex items-center justify-between rounded-lg">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <div className="size-10 bg-green-100 rounded-full flex items-center justify-center">
                       {validatedClient.type === 'natural' ? (
-                        <User className="w-5 h-5 text-green-600" />
+                        <User className="size-5 text-green-600" />
                       ) : (
-                        <Building className="w-5 h-5 text-green-600" />
+                        <Building className="size-5 text-green-600" />
                       )}
                     </div>
                     <div>
-                      <p className="font-semibold">{validatedClient.name}</p>
-                      <p className="text-sm text-gray-600">
-                        {validatedClient.code}
+                      <p className="font-semibold">
+                        {validatedClient.fullName}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {validatedClient.type === 'natural'
-                          ? 'Natural Person'
-                          : 'Legal Entity'}
+                        {validatedClient.email}
                       </p>
                     </div>
                   </div>
+                  <Badge
+                    variant="outline"
+                    className={
+                      validatedClient.type === 'natural'
+                        ? 'bg-green-50 text-green-700'
+                        : 'bg-blue-50 text-blue-700'
+                    }
+                  >
+                    {validatedClient.type === 'natural'
+                      ? 'Persona Física'
+                      : 'Persona Jurídica'}
+                  </Badge>
                 </div>
 
-                <div className="flex flex-col md:flex-row w-full justify-evenly gap-3">
-                  <div className="w-full">
-                    <Label htmlFor="serviceType">Service Type</Label>
-                    <Select value={serviceType} onValueChange={setServiceType}>
-                      <SelectTrigger className="mt-1 w-full">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Tax Advisory">
-                          Tax Advisory
-                        </SelectItem>
-                        <SelectItem value="Legal Consultation">
-                          Legal Consultation
-                        </SelectItem>
-                        <SelectItem value="Business Setup">
-                          Business Setup
-                        </SelectItem>
-                        <SelectItem value="Investment Advisory">
-                          Investment Advisory
-                        </SelectItem>
-                        <SelectItem value="HR Services">HR Services</SelectItem>
-                        <SelectItem value="Accounting">Accounting</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* Service Selection */}
+                <div className="w-full space-y-3">
+                  <Label>Tipus de Servei(s)</Label>
+                  <div className="flex flex-col gap-3 rounded-md border p-3">
+                    {SERVICES.map(service => {
+                      const selected = selectedServices.find(
+                        s => s.service === service.value
+                      )
+                      return (
+                        <div
+                          key={service.value}
+                          className="flex items-center justify-between"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={service.value}
+                              checked={!!selected}
+                              onCheckedChange={() =>
+                                toggleService(service.value)
+                              }
+                            />
+                            <label
+                              htmlFor={service.value}
+                              className="text-sm leading-none"
+                            >
+                              {service.label}
+                            </label>
+                          </div>
 
-                  <div className="w-full">
-                    <Label htmlFor="serviceFrequency">Service Frequency</Label>
-                    <Select
-                      value={serviceFrequency}
-                      onValueChange={setServiceFrequency}
-                    >
-                      <SelectTrigger className="mt-1 w-full">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="One-time">One-time</SelectItem>
-                        <SelectItem value="Recurring">Recurring</SelectItem>
-                      </SelectContent>
-                    </Select>
+                          {selected && (
+                            <Select
+                              value={selected.frequency}
+                              onValueChange={val =>
+                                updateFrequency(
+                                  service.value,
+                                  val as 'One-time' | 'Recurring'
+                                )
+                              }
+                            >
+                              <SelectTrigger className="w-[120px]">
+                                <SelectValue placeholder="Freqüència" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="One-time">Única</SelectItem>
+                                <SelectItem value="Recurring">
+                                  Recurrent
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 
+                {/* Actions */}
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button
                     variant="outline"
                     className="cursor-pointer"
                     onClick={() => setShowClientDialog(false)}
                   >
-                    Cancel
+                    Cancel·la
                   </Button>
-                  <Button onClick={handleStartKyc} disabled={!serviceType}>
-                    Start KYC Process
+                  <Button onClick={handleStartKyc} disabled={!isReady}>
+                    Iniciar Procés KYC
                   </Button>
                 </div>
               </div>
