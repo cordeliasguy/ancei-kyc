@@ -17,7 +17,7 @@ const app = new Hono()
 // CORS configuration - allow both dev and prod origins
 const allowedOrigins = [
   'http://localhost:5173', // Development
-  'https://convinced-sophronia-cordelia-38f9cb9e.koyeb.app' // Production
+  'https://ancei-kyc.onrender.com' // Production
 ]
 
 app.use(

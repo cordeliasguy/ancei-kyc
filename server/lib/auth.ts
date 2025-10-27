@@ -52,7 +52,7 @@ export const auth = betterAuth({
   trustedOrigins: [
     'http://localhost:5173',
     'http://localhost:3000',
-    'https://convinced-sophronia-cordelia-38f9cb9e.koyeb.app'
+    'https://ancei-kyc.onrender.com'
   ]
 })
 
