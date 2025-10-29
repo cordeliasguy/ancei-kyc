@@ -22,6 +22,7 @@ import { getServiceLabel } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { KycStatus } from '@server/sharedTypes'
 import { UserProfileDialog } from '@/components/user-profile-dialog'
+import { ExpiringDocumentsBadge } from '@/components/expiring-documents-badge'
 
 export const Route = createFileRoute('/_authenticated/company/dashboard')({
   component: CompanyDashboard
@@ -163,30 +164,7 @@ function CompanyDashboard() {
                 Filtres
               </div>
 
-              {/* Expiring documents indicator */}
-              {expiringDocuments ? (
-                expiringDocuments.length > 0 ? (
-                  <div className="mt-2 flex items-center space-x-2">
-                    <Badge
-                      variant="outline"
-                      className="bg-orange-50 text-orange-700 border-orange-200"
-                    >
-                      Hi ha {expiringDocuments.length} document
-                      {expiringDocuments.length > 1 && 's'} pròxim
-                      {expiringDocuments.length > 1 && 's'} a caducar
-                    </Badge>
-                  </div>
-                ) : (
-                  <div className="mt-2 flex items-center space-x-2">
-                    <Badge
-                      variant="outline"
-                      className="bg-green-50 text-green-700 border-green-200"
-                    >
-                      No hi ha documents pròxims a caducar
-                    </Badge>
-                  </div>
-                )
-              ) : null}
+              <ExpiringDocumentsBadge expiringDocuments={expiringDocuments} />
             </CardTitle>
           </CardHeader>
           <CardContent>

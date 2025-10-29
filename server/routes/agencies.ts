@@ -41,29 +41,31 @@ export const agenciesRoute = new Hono()
     const thirtyDaysFromNow = new Date()
     thirtyDaysFromNow.setDate(now.getDate() + 30)
 
-    // Convert to ISO strings (YYYY-MM-DD)
     const todayStr = now.toISOString().split('T')[0]
     const in30DaysStr = thirtyDaysFromNow.toISOString().split('T')[0]
 
-    // Get clients belonging to the agency
-    const clients = await db
-      .select({ id: clientsTable.id })
-      .from(clientsTable)
-      .where(eq(clientsTable.agencyId, agencyId))
-
-    const clientIds = clients.map(c => c.id)
-
-    if (clientIds.length === 0 || !todayStr || !in30DaysStr) {
+    if (!todayStr || !in30DaysStr) {
       return ctx.json({ documents: [] })
     }
 
-    // Get documents expiring within 30 days
+    // Get documents expiring within 30 days (with clientName)
     const documents = await db
-      .select()
+      .select({
+        id: clientDocumentsTable.id,
+        clientId: clientDocumentsTable.clientId,
+        name: clientDocumentsTable.name,
+        type: clientDocumentsTable.type,
+        expiresAt: clientDocumentsTable.expiresAt,
+        clientName: clientsTable.fullName // 👈 include client name
+      })
       .from(clientDocumentsTable)
+      .innerJoin(
+        clientsTable,
+        eq(clientDocumentsTable.clientId, clientsTable.id)
+      )
       .where(
         and(
-          inArray(clientDocumentsTable.clientId, clientIds),
+          eq(clientsTable.agencyId, agencyId),
           gte(clientDocumentsTable.expiresAt, todayStr),
           lte(clientDocumentsTable.expiresAt, in30DaysStr)
         )
